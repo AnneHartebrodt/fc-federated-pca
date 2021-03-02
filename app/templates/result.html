@@ -1,0 +1,172 @@
+{% extends "layout.html" %}
+{% block upload %}
+    <div id="container" style="width: 45%; height: 600px; float: left"></div>
+    <div style="width: 45%; height: 600px; float: right">
+        <h2>Global Parameters</h2>
+        <p><b># of PCs: </b> {{ pcs }}</p>
+    </div>
+    <div> Click on data points or use 'lasso select'. Click the rerun button to remove the outliers from the data and
+        restart the calculator.
+    </div>
+{% endblock %}
+{% block result %}
+    <div class="chart" id="pca-out">
+
+        <script type="text/javascript">
+            var x = JSON.parse('{{ x | tojson | safe }}')['x'];
+            var y = JSON.parse('{{ y | tojson | safe }}')['y'];
+            var colors = JSON.parse('{{ color | tojson | safe }}')['color'];
+            var unique_ids = JSON.parse('{{ point_ids | tojson | safe }}')['point_ids'];
+            //for (i = 0; i < colors.length; ++i) {
+            //  colors[i] = '#00000';
+            //}
+            var myPlot = document.getElementById('pca-out'),
+                data = [{
+                    x: x,
+                    y: y,
+                    colors: colors,
+                    type: 'scatter',
+                    mode: 'markers', marker: {size: 8, color: colors},
+                    text: unique_ids
+                }],
+                layout = {
+                    hovermode: 'closest',
+                    title: 'Federated PCA visualisation'
+                };
+
+            Plotly.newPlot('pca-out', data, layout);
+        </script>
+    </div>
+    <input type="button" value="Calculate" id="calc" class="my-button">
+
+    {% if is_coordinator %}
+        <form class="pure-form" action="./shutdown_application" method="post"
+              onsubmit="return confirm('Do you really want to shut down the application?');"
+              enctype=multipart/form-data>
+            <div class="input-group-run">
+                <input value="Shutdown application" style="margin: 20px; float: right" type="submit"
+                       class="btn btn-primary btn-lg">
+            </div>
+        </form>
+    {% endif %}
+
+
+    <script>
+        var master = JSON.parse('{{ is_coordinator | tojson | safe}}')['is_coordinator'];
+        if (master) {
+            document.getElementById("calc").disabled = false;
+        } else {
+            document.getElementById("calc").disabled = true;
+        }
+        var allow_rerun = JSON.parse('{{ allow_rerun | tojson | safe}}')['allow_rerun']
+        if (allow_rerun) {
+            document.getElementById("calc").disabled = false;
+        }
+    </script>
+
+
+    <script>
+        var selected = [];
+
+        function removeItemOnce(arr, value) {
+            var index = arr.indexOf(value);
+            if (index > -1) {
+                arr.splice(index, 1);
+            }
+            return arr;
+        }
+
+        myPlot = document.getElementById('pca-out')
+        myPlot.on('plotly_click', function (data) {
+            var col = '#00000';
+            var pn = '',
+                tn = '',
+                colors = [];
+            for (var i = 0; i < data.points.length; i++) {
+                if (selected.indexOf(data.points[i].pointNumber) != -1) {
+                    removeItemOnce(selected, data.points[i].pointNumber);
+                    col = data.points[i].color
+                } else {
+                    selected[selected.length] = data.points[i].pointNumber;
+                    col = '#c54c82';
+                }
+
+                pn = data.points[i].pointNumber;
+                tn = data.points[i].curveNumber;
+                colors = data.points[i].data.marker.color;
+            }
+            ;
+            colors[pn] = col
+            console.log(selected);
+            var update = {'marker': {color: colors, size: 8}};
+            Plotly.restyle('pca-out', update, [tn]);
+        });
+        myPlot.on('plotly_selected', function (data) {
+
+            var col = '#00000';
+            var pn = '',
+                tn = '';
+            var colors = [];
+            for (var i = 0; i < data.points.length; i++) {
+                console.log(data.points[i].pointNumber)
+                if (selected.indexOf(data.points[i].pointNumber) != -1) {
+                    removeItemOnce(selected, data.points[i].pointNumber);
+                    col = data.points[i].color
+                } else {
+                    selected[selected.length] = data.points[i].pointNumber;
+                    col = '#c54c82';
+                }
+
+                pn = data.points[i].pointNumber;
+                tn = data.points[i].curveNumber;
+                colors = data.points[i].data.marker.color;
+                colors[pn] = col;
+
+            }
+
+            console.log(selected);
+            console.log(colors)
+            var update = {'marker': {color: colors, size: 8}};
+            Plotly.restyle('pca-out', update, [tn]);
+        });
+        myPlot.on('plotly_restyle', function (data) {
+            console.log(data);
+
+        });
+
+    </script>
+
+    <script>
+        function addSubmit() {
+            console.log('Clicked the button ajax 1')
+            console.log('selected')
+            var remove = {'selected': selected}
+            $.ajax({
+                url: "./rerun",
+                type: "POST",
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(remove),
+                dataType: "json",
+                success: window.location.replace('./loading')
+            });
+
+        }
+
+        $('.my-button').on('click', addSubmit);
+    </script>
+
+    <!--   <script>
+           //Check if rerun has been triggered by the coordinator
+           var intervalID = window.setInterval(enable_rerun, 10000);
+
+           function enable_rerun() {
+               $.getJSON("./rerun_client",
+                   function (data) {
+                       console.log(data.rerun)
+                       if (data.rerun) {
+                           document.getElementById("calc").disabled = false;
+                       }
+                   });
+           }
+       </script> -->
+{% endblock %}

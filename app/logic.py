@@ -44,6 +44,9 @@ class AppLogic:
         self.local_result = None
         self.global_result = None
 
+        # === Web status ===
+        self.web_status = 'index'
+
     def handle_setup(self, client_id, master, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
         self.id = client_id
