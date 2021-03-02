@@ -1,0 +1,4 @@
+bottle # webserver
+jsonpickle # to send complex datatypes
+numpy # for mathematical computations
+pyyaml # to read config file
