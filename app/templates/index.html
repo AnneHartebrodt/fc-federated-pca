@@ -25,15 +25,6 @@
 
 </head>
 <body>
-{% with messages = get_flashed_messages() %}
-    {% if messages %}
-        <ul class=flashes>
-            {% for message in messages %}
-                <li>{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-{% endwith %}
 <div class="pure-menu pure-menu-horizontal">
     <a class="pure-menu-heading" href="">Federated Principal Component Analysis</a>
     <ul class="pure-menu-list">

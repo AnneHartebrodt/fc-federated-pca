@@ -1,11 +1,11 @@
 import shutil
 import threading
 import time
-
 import jsonpickle
 import yaml
-
 from app.algo import local_computation, global_aggregation
+from app.Aggregator_FC_Federated_PCA import AggregatorFCFederatedPCA
+from app.Client_FC_FederatedPCA import ClientFCFederatedPCA
 
 
 class AppLogic:
@@ -28,11 +28,10 @@ class AppLogic:
         self.coordinator = None
         self.clients = None
 
-        # === Directories, input files always in INPUT_DIR. Write your output always in OUTPUT_DIR
-        self.INPUT_DIR = "/mnt/input"
-        self.OUTPUT_DIR = "/mnt/output"
+
 
         # === Variables from config.yml
+        self.config_available = True
         self.input_filename = None
         self.sep = None
         self.output_filename = None
@@ -47,13 +46,24 @@ class AppLogic:
         # === Web status ===
         self.web_status = 'index'
 
+
+        # === FCFederatedPCA instance ===
+        self.svd = None
+
+        self.step = 'pre_start'
+
     def handle_setup(self, client_id, master, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
         self.id = client_id
         self.coordinator = master
         self.clients = clients
         print(f"Received setup: {self.id} {self.coordinator} {self.clients}", flush=True)
-
+        if self.coordinator:
+            self.svd = AggregatorFCFederatedPCA(self.coordinator)
+        else:
+            self.svd = ClientFCFederatedPCA(self.coordinator)
+        # set the pointer to the first action
+        self.step = self.svd.next_state()
         self.thread = threading.Thread(target=self.app_flow)
         self.thread.start()
 
@@ -65,8 +75,10 @@ class AppLogic:
     def handle_outgoing(self):
         print("Process outgoing data...", flush=True)
         # This method is called when data is requested
+        outgoing_data = self.data_outgoing
+        self.data_outgoing = None
         self.status_available = False
-        return self.data_outgoing
+        return outgoing_data
 
     def read_config(self):
         with open(self.INPUT_DIR + "/config.yml") as f:
@@ -82,7 +94,7 @@ class AppLogic:
 
         # === States ===
         state_initializing = 1
-        state_read_input = 2
+        state_read_input_files = 2
         state_local_computation = 3
         state_wait_for_aggregation = 4
         state_global_aggregation = 5
@@ -91,28 +103,32 @@ class AppLogic:
         # Initial state
         state = state_initializing
         while True:
-
-            if state == state_initializing:
+            if self.step == 'load_config':
                 self.progress = "initializing..."
-                print("[CLIENT] Initializing...", flush=True)
+                print("[CLIENT] Parsing parameter file...", flush=True)
                 if self.id is not None:  # Test is setup has happened already
-                    if self.coordinator:
-                        print("I am the coordinator.", flush=True)
-                    else:
-                        print("I am a participating client.", flush=True)
-                    state = state_local_computation
-                print("[CLIENT] Initializing finished.", flush=True)
+                    # parse parameters
+                    self.svd.parse_configuration()
+                    self.step = self.svd.next_state()
+                print("[CLIENT] finished parsing parameter file.", flush=True)
 
-            if state == state_read_input:
+            elif self.step == 'read_data':
                 self.progress = "read input..."
                 print("[CLIENT] Read input...", flush=True)
                 # Read the config file
-                self.read_config()
+                self.svd.read_input_files()
+                self.svd.compute_local_sums()
                 # Here you could read in your input files
-                state = state_local_computation
+                self.step = self.svd.next_state()
                 print("[CLIENT] Read input finished.", flush=True)
 
-            if state == state_local_computation:
+            elif self.step == 'scale_data':
+                self.svd.scale_data()
+
+            elif self.step == 'finalize':
+                self.save_scaled_data()
+
+            elif state == state_local_computation:
                 self.progress = "compute local results..."
                 print("[CLIENT] Compute local results...", flush=True)
                 self.progress = 'computing...'
@@ -136,7 +152,7 @@ class AppLogic:
                     print('[CLIENT] Send data to coordinator', flush=True)
                 print("[CLIENT] Compute local results finished.", flush=True)
 
-            if state == state_wait_for_aggregation:
+            elif state == state_wait_for_aggregation:
                 self.progress = "wait for aggregated results..."
                 print("[CLIENT] Wait for aggregated results from coordinator...", flush=True)
                 # Wait until received broadcast data from coordinator
@@ -151,7 +167,7 @@ class AppLogic:
                     print("[CLIENT] Processing aggregated results finished.", flush=True)
 
             # GLOBAL AGGREGATION
-            if state == state_global_aggregation:
+            elif state == state_global_aggregation:
                 self.progress = "aggregate results..."
                 print("[COORDINATOR] Aggregate local results to a global result...", flush=True)
                 self.progress = 'Global aggregation...'
@@ -177,7 +193,7 @@ class AppLogic:
                         f"[COORDINATOR] Data of {str(len(self.clients) - len(self.data_incoming))} client(s) still "
                         f"missing...)", flush=True)
 
-            if state == state_finish:
+            elif state == state_finish:
                 self.progress = "finishing..."
                 print("[CLIENT] FINISHING", flush=True)
 
@@ -195,7 +211,17 @@ class AppLogic:
                 self.status_finished = True
                 self.progress = "finished."
                 break
+            else:
+                print("[CLIENT] NO SUCH STATE", flush=True)
 
+            # Dispatch data if available
+            if self.svd.data_available:
+                # in the svd object
+                self.svd.data_available = False
+                self.data_outgoing = jsonpickle.encode(self.svd.out)
+                self.svd.out = None
+                # the app orchestration status
+                self.status_available = True
             time.sleep(1)
 
 
