@@ -86,17 +86,6 @@ class AppLogic:
 
     def app_flow(self):
         # This method contains a state machine for the participant and coordinator instance
-
-        # === States ===
-        state_initializing = 1
-        state_read_input_files = 2
-        state_local_computation = 3
-        state_wait_for_aggregation = 4
-        state_global_aggregation = 5
-        state_finish = 6
-
-        # Initial state
-        state = 7
         while True:
             print(self.step)
             if self.step == Step.LOAD_CONFIG:

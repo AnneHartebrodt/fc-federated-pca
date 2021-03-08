@@ -1,4 +1,4 @@
-from bottle import Bottle, jinja2_template as template, redirect, TEMPLATE_PATH, static_file
+from bottle import Bottle, jinja2_template as template, redirect, TEMPLATE_PATH, static_file, get
 from .logic import logic
 
 web_server = Bottle()
@@ -10,9 +10,10 @@ TEMPLATE_PATH.insert(0, 'templates')
 # Otherwise your app does not respond to calls made by the FeatureCloud system quickly enough
 # Use the threaded loop in the app_flow function inside the file logic.py instead
 
-@web_server.route('/static/<filename:path>')
-def send_static(filename):
-    return static_file(filename, root='static')
+@web_server.route('/static/<filepath:path>')
+def server_static(filepath):
+    print('Access static')
+    return static_file(filepath, root='./static')
 
 @web_server.route('/', methods=['GET'])
 def root():
@@ -28,7 +29,9 @@ def root():
     elif logic.web_status == 'final':
         return redirect('/shutdown')
     else:
+        print('Default')
         return template('loading.html')
+
 
 
 @web_server.route('/setup', methods=['GET'])
@@ -40,7 +43,7 @@ def setup():
         except:
             return template("init.html")
     else:
-        template('loading.html')
+        return template('loading.html')
 
 
 # @web_server.route('/result', methods=['GET'])

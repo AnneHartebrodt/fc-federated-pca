@@ -37,7 +37,6 @@ class FCFederatedPCA:
         files = os.listdir(INPUT_DIR)
         for file in files:
             if regex.match(file):
-
                 config_file = file
                 break
         if op.exists(op.join(INPUT_DIR, config_file)):
@@ -72,6 +71,11 @@ class FCFederatedPCA:
                 else:
                     self.has_colnames = False
                 self.sep =  parameter_list['settings']['delimiter']
+
+                self.center = parameter_list['scaling']['center']
+                self.scale_variance = parameter_list['scaling']['scale_variance']
+                self.transform = parameter_list['scaling']['transform']
+
                 self.allow_rerun = parameter_list['privacy']['allow_rerun']
                 self.allow_transmission =  parameter_list['privacy']['allow_transmission']
 
