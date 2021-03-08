@@ -33,13 +33,20 @@ class FCFederatedPCA:
         print('[API] /setup parsing parameter file ')
 
         regex = re.compile('^config.*\.(yaml||yml)$')
-        config_file = None
+        config_file = "ginger_tea.txt"
+        # check input dir for config file
         files = os.listdir(INPUT_DIR)
         for file in files:
             if regex.match(file):
-                config_file = file
+                config_file = op.join(INPUT_DIR, file)
                 break
-        if op.exists(op.join(INPUT_DIR, config_file)):
+        #check output dir for config file
+        files = os.listdir(OUTPUT_DIR)
+        for file in files:
+            if regex.match(file):
+                config_file = op.join(OUTPUT_DIR, file)
+                break
+        if op.exists(config_file):
             print('[API] /setup config file found ... parsing')
             self.config_available = True
             with open(op.join(INPUT_DIR, config_file), 'r') as file:
@@ -55,13 +62,12 @@ class FCFederatedPCA:
                 self.projection_file =  op.join(OUTPUT_DIR, parameter_list['output']['projections'])
                 self.scaled_data_file =  op.join(OUTPUT_DIR, parameter_list['output']['scaled_data'])
 
+                print('files')
 
                 self.k =  parameter_list['algorithm']['pcs']
                 self.algorithm =  parameter_list['algorithm']['algorithm']
                 self.federated_qr = parameter_list['algorithm']['qr']
-                self.eigenvector_update =  parameter_list['algorithm']['eigenvector_update']
-                self.data_partioning = parameter_list['algorithm']['data_partitioning']
-                self.max_iterations =  parameter_list['algorithm']['max_iterations']
+                self.max_iterations = parameter_list['algorithm']['max_iterations']
                 if parameter_list['settings']['rownames']:
                     self.has_rownames = True
                 else:
@@ -72,15 +78,19 @@ class FCFederatedPCA:
                     self.has_colnames = False
                 self.sep =  parameter_list['settings']['delimiter']
 
+                print('algo settings')
+                print(parameter_list['scaling'])
                 self.center = parameter_list['scaling']['center']
                 self.scale_variance = parameter_list['scaling']['scale_variance']
                 self.transform = parameter_list['scaling']['transform']
 
+
+                print('scaling')
                 self.allow_rerun = parameter_list['privacy']['allow_rerun']
-                self.allow_transmission =  parameter_list['privacy']['allow_transmission']
+                self.allow_transmission = parameter_list['privacy']['allow_transmission']
 
                 self.outlier_removal = parameter_list['privacy']['outlier_removal']
-                self.encryption =  parameter_list['privacy']['encryption']
+                self.encryption = parameter_list['privacy']['encryption']
 
                 # Fall back to local outlier removal
                 if not self.allow_transmission and self.outlier_removal == 'global':

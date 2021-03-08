@@ -1,5 +1,8 @@
-from bottle import Bottle, jinja2_template as template, redirect, TEMPLATE_PATH, static_file, get
+from bottle import Bottle, jinja2_template as template, redirect, TEMPLATE_PATH, static_file, get, request
 from .logic import logic
+import yaml
+from app.params import OUTPUT_DIR
+import os.path as op
 
 web_server = Bottle()
 TEMPLATE_PATH.insert(0, 'templates')
@@ -19,11 +22,8 @@ def server_static(filepath):
 def root():
     """
     """
-    if logic.web_status == 'start' or logic.web_status == 'init_algorithm':
-        if not logic.config_available:
-            return template('start_coordinator.html', is_coordinator=logic.coordinator)
-        else:
-            return template('loading.html')
+    if logic.web_status == 'setup_via_user_interface':
+        return template('start_coordinator.html', is_coordinator=logic.coordinator)
     elif logic.web_status == 'setup' or logic.web_status == 'local_outlier_removal' or logic.web_status == 'global_outlier_removal':
         return redirect("/result")
     elif logic.web_status == 'final':
@@ -148,62 +148,47 @@ def setup():
 #     rset('outlier_removal', request.form.get('outlierremoval'))
 #
 #
-# @web_server.route('/run', methods=['POST'])
-# def run():
-#
-#     # check filename
-#     print("[WEB] /run Checking if file(s) exist(s)")
-#     if not op.exists(op.join(INPUT_DIR, request.form.get('file'))):
-#         flash(
-#             "Invalid file name -- Please check if the filename you entered exists and is relative to the base directory")
-#         return template("start_coordinator.html",  is_coordinator=logic.coordinator)
-#
-#     else:
-#         rset('input_file', op.join(INPUT_DIR, request.form.get('file')))
-#         # This does not need to happen here, but for web use there are default paths.
-#         # Could be added as advanced option later
-#         rset('eigenvalue_file', op.join(OUTPUT_DIR, 'eigenvalues.tsv'))
-#         rset('left_eigenvector_file', op.join(OUTPUT_DIR, 'left_eigenvectors.tsv'))
-#         rset('right_eigenvector_file', op.join(OUTPUT_DIR, 'right_eigenvectors.tsv'))
-#         rset('projection_file', op.join(OUTPUT_DIR, 'projections.tsv'))
-#     # These are settings for all users
-#     if request.form.get('colnames') is not None:
-#         rset('colnames', 0)
-#     else:
-#         rset('colnames', None)
-#
-#     if request.form.get('rownames') is not None:
-#         rset('rownames', 0)
-#     else:
-#         rset('rownames', None)
-#
-#     rset('sep', str(request.form.get("sep")))
-#     rset('max_iterations', request.form.get('max_iterations'))
-#
-#     # These are the Coordinator settings.
-#     if logic.coordinator:
-#         # get number principal components
-#         print("[WEB] /run Setting parameters in redis")
-#         store_parameters_in_redis()
-#         try:
-#             # Construct parameter json
-#             out = {'pcs': rget('pcs'),
-#                    'allow_rerun': rget('allow_rerun'),
-#                    'transmit_projections': rget('transmit_projections'),
-#                    'outlier_removal': rget('outlier_removal')}
-#         except:
-#             flash('Something went wrong setting up the parameters!')
-#             return template('start_coordinator.html',  is_coordinator=logic.coordinator)
-#
-#         # Set available to true once all the parameters have been set.
-#         rset("logic.web_status", 'init_algorithm')
-#         # add the logic.web_status to the parameter object
-#         out['logic.web_status'] = 'init_algorithm'
-#         rset('outbox', out)
-#         rset("available", True)
-#         tasks.enqueue(load_data_and_start)
-#     return template("loading.html")
-#
+@web_server.route('/run', method='POST')
+def run():
+    parameter_list = {}
+    parameter_list['input'] = {}
+    parameter_list['input']['data'] = request.forms.get('file')
+    parameter_list['output']={}
+    parameter_list['output']['eigenvalues'] = 'eigenvalues.tsv'
+    parameter_list['output']['left_eigenvectors'] = 'left_eigenvectors.tsv'
+    parameter_list['output']['right_eigenvectors'] = 'right_eigenvectors.tsv'
+    parameter_list['output']['projections'] = 'projections.tsv'
+    parameter_list['output']['scaled_data'] = 'scaled_data.tsv'
+
+    parameter_list['algorithm'] = {}
+    parameter_list['algorithm']['pcs'] = int(request.forms.get('pcs'))
+    parameter_list['algorithm']['algorithm'] = request.forms.get('algorithm')
+    parameter_list['algorithm']['qr'] = 'centralised'
+    parameter_list['algorithm']['max_iterations'] = int(request.forms.get('max_iterations'))
+
+    parameter_list['settings'] = {}
+    parameter_list['settings']['rownames'] = bool(request.forms.get('rownames'))
+    parameter_list['settings']['colnames'] = bool(request.forms.get('colnames'))
+    parameter_list['settings']['delimiter'] = request.forms.get('sep')
+
+    parameter_list['scaling'] = {}
+    parameter_list['scaling']['center'] = request.forms.get('center')
+    parameter_list['scaling']['scale_variance'] = request.forms.get('scale_variance')
+    parameter_list['scaling']['transform'] = request.forms.get('transform')
+
+    parameter_list['privacy'] = {}
+    parameter_list['privacy']['allow_rerun'] = bool(request.forms.get('allow_rerun'))
+    parameter_list['privacy']['allow_transmission'] = bool(request.forms.get('transmit_projections'))
+
+    parameter_list['privacy']['outlier_removal'] = request.forms.get('outlierremoval')
+    parameter_list['privacy']['encryption'] = False
+
+    param_obj = {}
+    param_obj['fc_pca'] = parameter_list
+    with open(op.join(OUTPUT_DIR, 'config.yaml'), 'w') as handle:
+        yaml.safe_dump(param_obj, handle)
+    return template("loading.html")
+
 #
 @web_server.route('/loading', methods=['GET'])
 def loading():

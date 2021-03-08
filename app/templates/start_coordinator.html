@@ -57,17 +57,26 @@
                      <option value="power-iteration">Power Iteration</option>
                 </select><br><br>
 
-                <label> Data partitioning</label><br>
-                <select name="partition" id="partition">
-                    <option value="horizontal">Horizontal</option>
-                     <option value="vertical">Vertical</option>
-                </select><br><br>
-
                 <label> # Principal Components</label><br>
                 <input type="number" class="form-control" min="1" value=10 name="pcs"><br><br>
                 <label> Max. iterations </label><br>
                 <input type="number" class="form-control" min="1" value=2000 name="max_iterations"><br>
 
+            </div>
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Data scaling <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">Info</span>
+                </div></legend>
+                <input type="checkbox" id="center" name="center" value="center">
+                <label for="center"> Center variables </label><br><br>
+                <input type="checkbox" id="scale_variance" name="scale_variance" value="scale_variance">
+                <label for="scale_variance"> Scale variables to unit variance </label>
+                <label> Transform</label><br>
+                <select name="transform" id="transform">
+                    <option value="no_transform">None</option>
+                     <option value="log2">Log2</option>
+                     <option value="log10">Log10</option>
+                </select><br><br>
             </div>
             <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
                 <legend>Privacy settings <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />

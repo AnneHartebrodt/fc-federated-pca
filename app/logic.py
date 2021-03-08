@@ -31,7 +31,6 @@ class AppLogic:
 
 
         # === Variables from config.yml
-        self.config_available = True
         self.input_filename = None
         self.sep = None
         self.output_filename = None
@@ -49,7 +48,6 @@ class AppLogic:
 
         # === FCFederatedPCA instance ===
         self.svd = None
-
         self.step = 'pre_start'
 
     def handle_setup(self, client_id, master, clients):
@@ -89,13 +87,20 @@ class AppLogic:
         while True:
             print(self.step)
             if self.step == Step.LOAD_CONFIG:
-                self.progress = "initializing..."
-                print("[CLIENT] Parsing parameter file...", flush=True)
-                if self.id is not None:  # Test is setup has happened already
-                    # parse parameters
-                    self.svd.parse_configuration()
-                    self.svd.finalize_parameter_setup()
-                print("[CLIENT] finished parsing parameter file.", flush=True)
+                try:
+                    self.progress = "initializing..."
+                    print("[CLIENT] Parsing parameter file...", flush=True)
+                    if self.id is not None:  # Test is setup has happened already
+                        # parse parameters
+                        self.svd.parse_configuration()
+
+                    if not self.svd.config_available:
+                        self.web_status = 'setup_via_user_interface'
+                    else:
+                        self.svd.finalize_parameter_setup()
+                        print("[CLIENT] finished parsing parameter file.", flush=True)
+                except:
+                    print('Error parsing parameter file!')
 
             elif self.step == Step.WAIT_FOR_PARAMS:
                 print('CLIENT waiting for parameters')
