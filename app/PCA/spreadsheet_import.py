@@ -15,16 +15,8 @@ def data_import(filename, header=None, rownames=None, sep='\t', outfile=None, tr
     :return:
     """
 
-    data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=sep)
-    if rownames is not None:
-        sample_ids = data.iloc[:, rownames]
-        if header is not None:
-            data = data.drop(data.columns[rownames], axis=1)
-        else:
-            data = data.drop([rownames], axis=1)
-    else:
-        sample_ids = []
-
+    data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=sep, index_col=rownames)
+    sample_ids = data.index
     variable_names = data.columns.values
     data = data.values
     if transpose:

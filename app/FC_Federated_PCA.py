@@ -4,17 +4,30 @@ import re
 import os.path as op
 from app.params import INPUT_DIR, OUTPUT_DIR
 from app.TabData import TabData
+import pandas as pd
+import traceback
+from app.Steps import Step
 
 class FCFederatedPCA:
-    def __init__(self, coordinator):
+    def __init__(self):
         self.step = 0
         self.tabdata = None
         self.SVD = None
-        self.stage = 'init'
         self.config_available = False
-        self.coordinator = coordinator
         self.out = None
-        self.data_available = False
+        self.send_data = False
+        self.computation_done = False
+        self.coordinator = False
+        self.step_queue = [Step.LOAD_CONFIG] # this is the initial step queue
+        self.state = 'waiting_for_start' # this is the inital state
+
+
+    def next_state(self):
+        self.state = self.step_queue.pop(0)
+        return self.state
+
+    def get_state(self):
+        return self.get_state()
 
     def parse_configuration(self):
         print('[API] /setup parsing parameter file ')
@@ -24,16 +37,17 @@ class FCFederatedPCA:
         files = os.listdir(INPUT_DIR)
         for file in files:
             if regex.match(file):
-                print('[API] /setup config file found')
+
                 config_file = file
                 break
         if op.exists(op.join(INPUT_DIR, config_file)):
+            print('[API] /setup config file found ... parsing')
             self.config_available = True
             with open(op.join(INPUT_DIR, config_file), 'r') as file:
                 parameter_list = yaml.load(file, Loader=yaml.FullLoader)
                 parameter_list = parameter_list['fc_pca']
                 # Files
-                self.input_file = parameter_list['input']['data']
+                self.input_file = op.join(INPUT_DIR, parameter_list['input']['data'])
 
                 # prepend mount folder
                 self.eigenvalue_file =  op.join(OUTPUT_DIR, parameter_list['output']['eigenvalues'])
@@ -45,7 +59,7 @@ class FCFederatedPCA:
 
                 self.k =  parameter_list['algorithm']['pcs']
                 self.algorithm =  parameter_list['algorithm']['algorithm']
-                self.federated_qr =  parameter_list['algorithm']['qr']
+                self.federated_qr = parameter_list['algorithm']['qr']
                 self.eigenvector_update =  parameter_list['algorithm']['eigenvector_update']
                 self.data_partioning = parameter_list['algorithm']['data_partitioning']
                 self.max_iterations =  parameter_list['algorithm']['max_iterations']
@@ -68,32 +82,58 @@ class FCFederatedPCA:
                 if not self.allow_transmission and self.outlier_removal == 'global':
                     self.outlier_removal = 'local'
 
-                self.finalize_parameter_setup()
-
-
-                # No user interaction required, set available to true
-                # master still sends configuration to all clients.
-                if self.coordinator:
-                    self.out = {'pcs': self.k,
-                           'allow_rerun': self.allow_rerun,
-                           'allow_transmission': self.allow_transmission,
-                           'outlier_removal': self.outlier_removal}
-                    self.data_available = True
+                print('[API] /setup config file found ... parsing done')
 
         else:
             print('[API] /setup no configuration file found -- configure using user interface ')
             self.config_available = False
 
     def read_input_files(self):
-        self.tabdata = TabData.from_file(self.input_file)
+        try:
 
+            self.tabdata = TabData.from_file(self.input_file, header = self.has_colnames,
+                                             index=self.has_rownames, sep=self.sep)
+            self.computation_done = True
+        except Exception as e:
+            print('[API] reading data failed')
+            print(traceback.print_exc())
 
-    def finalize_parameter_setup(self):
+    def scale_data(self, incoming):
+        try:
+            means = incoming['means']
+            print(means)
+            print(self.tabdata.data)
+            self.tabdata.scaled = self.tabdata.data - means
+            self.computation_done = True
+            self.send_data = False
+        except Exception as e:
+            print('[API] scaling data failed')
+            traceback.print_exc()
         return True
 
-    def scale_data(self, means):
-        self.tabdata.scaled = self.tabdata.data - means
+    def scale_data_to_unit_variance(self, incoming):
+        try:
+            vars = incoming['vars']
+            print(self.tabdata.data)
+            self.tabdata.scaled = self.tabdata.data/vars
+            self.computation_done = True
+            self.send_data = False
+        except Exception as e:
+            print('[API] scaling data failed')
+            traceback.print_exc()
 
+    def set_parameters(self, incoming):
+        try:
+            print('[API] setting parameters')
+            self.k = incoming['pcs']
+            self.allow_rerun = incoming['allow_rerun']
+            self.allow_transmission = incoming['allow_transmission']
+            self.outlier_removal = incoming['outlier_removal']
+            self.computation_done = True
+        except Exception as e:
+            print('[API] setting parameters failed')
+            traceback.print_exc()
+        return True
 
     def save_scaled_data(self):
         saveme = pd.DataFrame(self.tabdata.scaled)

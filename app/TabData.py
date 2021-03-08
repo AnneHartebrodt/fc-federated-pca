@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sc
 import pandas as pd
 import app.PCA.spreadsheet_import as spi
-
+import traceback
 class TabData:
     def __init__(self, data, columns, rows, scaled):
         self.data = data
@@ -35,6 +35,27 @@ class TabData:
         :param sep:
         :return:
         """
-        data, rows, columns = spi.data_import(filename, header=header, index=index, sep=sep)
-        return cls(data, columns, rows, None)
+        if header:
+            header = 0
+        else:
+            header = None
+
+        if index:
+            index = 0
+        else:
+            index = None
+        print('reading')
+        print(filename)
+        print(header)
+        print(index)
+        print(sep)
+        try:
+            data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=sep, index_col=index)
+            sample_ids = data.index
+            variable_names = data.columns.values
+            data = data.values
+        except Exception:
+            traceback.print_exc()
+        #data, rows, columns = spi.data_import(filename, header=header, rownames=index, sep=sep)
+        return cls(data, variable_names, sample_ids, None)
 

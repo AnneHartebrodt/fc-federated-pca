@@ -3,32 +3,45 @@ import app.SVD as SVD
 import numpy as np
 from app.FC_Federated_PCA import FCFederatedPCA
 import pandas as pd
+import traceback
+from app.Steps import Step
 
 class ClientFCFederatedPCA(FCFederatedPCA):
     def __init__(self):
         self.dummy = None
-        self.state = 'init'
-        self.step_queue = ['load_config']
-
-    def next_state(self):
-        self.state = self.step_queue.pop(0)
-        return self.state
-
-    def get_state(self):
-        return self.get_state()
-
+        self.coordinator = False
+        FCFederatedPCA.__init__(self)
 
     def finalize_parameter_setup(self):
-        self.step_queue = self.step_queue + ['read_data', 'scale_data', 'finalize']
+        self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
+                                             Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
+                                             Step.SCALE_TO_UNIT_VARIANCE, Step.FINALIZE]
+        self.computation_done = True
+        print('[API] [CLIENT] /setup config done!')
         # if self.algorithm == 'power_iteration':
         #     self.step_queue = ['init_algorithm', 'agree_on_row_names', 'init_power_iteration']
         # else:
         #     self.step_queue = ['init_algorithm', 'pca']
 
     def compute_local_sums(self):
-        sums = np.sum(self.tabdata.data, axis=0)
-        self.out = sums
-        self.data_available = True
+        try:
+            sums = np.sum(self.tabdata.data, axis=0)
+            outdata = {'sums': sums, 'sample_count': self.tabdata.row_count}
+            self.out = outdata
+            self.send_data = True
+            self.computation_done = True
+        except Exception as e:
+            print('[API] computing local sums failed')
+            traceback.print_exc()
+
+        return True
+
+    def compute_local_sum_of_squares(self):
+        vars = np.sum(np.square(self.tabdata.data), axis=0)
+        outdata = {'sums': vars, 'sample_count': self.tabdata.row_count}
+        self.out = outdata
+        self.send_data = True
+        self.computation_done = True
         return True
 
 

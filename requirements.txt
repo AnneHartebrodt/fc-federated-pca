@@ -2,3 +2,7 @@ bottle # webserver
 jsonpickle # to send complex datatypes
 numpy # for mathematical computations
 pyyaml # to read config file
+jinja2 # templating engine
+scipy
+pandas
+
