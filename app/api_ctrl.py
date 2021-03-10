@@ -40,5 +40,5 @@ def ctrl_data_out():
 @api_server.route("/data", method="POST")
 def ctrl_data_in():
     print(f"[API] POST /data", flush=True)
-    logic.handle_incoming(request.body)
+    logic.handle_incoming(request.body, request.query)
     return ""

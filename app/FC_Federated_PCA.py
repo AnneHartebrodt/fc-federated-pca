@@ -7,12 +7,14 @@ from app.TabData import TabData
 import pandas as pd
 import traceback
 from app.Steps import Step
+import numpy as np
+import copy
 
 class FCFederatedPCA:
     def __init__(self):
         self.step = 0
         self.tabdata = None
-        self.SVD = None
+        self.pca = None
         self.config_available = False
         self.out = None
         self.send_data = False
@@ -20,6 +22,8 @@ class FCFederatedPCA:
         self.coordinator = False
         self.step_queue = [Step.LOAD_CONFIG] # this is the initial step queue
         self.state = 'waiting_for_start' # this is the inital state
+        self.iteration_counter = 0
+        self.converged = False
 
 
     def next_state(self):
@@ -91,6 +95,7 @@ class FCFederatedPCA:
 
                 self.outlier_removal = parameter_list['privacy']['outlier_removal']
                 self.encryption = parameter_list['privacy']['encryption']
+                self.show_result = parameter_list['privacy']['show_result']
 
                 # Fall back to local outlier removal
                 if not self.allow_transmission and self.outlier_removal == 'global':
@@ -115,8 +120,6 @@ class FCFederatedPCA:
     def scale_data(self, incoming):
         try:
             means = incoming['means']
-            print(means)
-            print(self.tabdata.data)
             self.tabdata.scaled = self.tabdata.data - means
             self.computation_done = True
             self.send_data = False
@@ -128,7 +131,6 @@ class FCFederatedPCA:
     def scale_data_to_unit_variance(self, incoming):
         try:
             vars = incoming['vars']
-            print(self.tabdata.data)
             self.tabdata.scaled = self.tabdata.data/vars
             self.computation_done = True
             self.send_data = False
@@ -154,4 +156,58 @@ class FCFederatedPCA:
         saveme.columns = self.tabdata.columns
         saveme.rows = self.tabdata.rows
         saveme.to_csv(self.scaled_data_file, header=True, index=True, sep='\t')
+        self.computation_done = True
+        self.send_data = False
         return True
+
+    def save_pca(self):
+        self.pca.to_csv(self.left_eigenvector_file,self.right_eigenvector_file, self.eigenvalue_file)
+        self.computation_done = True
+        self.send_data = False
+
+    def orthogonalise_current(self, incoming):
+        print('starting orthogonalise_current')
+        self.global_conorms = incoming['global_conorms']
+        # update every cell individually
+        for gp in range(len(self.global_conorms)):
+            for row in range(self.pca.G.shape[0]):
+                self.pca.G[row, self.current_vector] = self.pca.G[row, self.current_vector] - \
+                                                      self.pca.G[row, gp] * self.global_conorms[gp]
+        print('ending orthogonalise_current')
+        self.computation_done = True
+        self.send_data = False
+
+    def normalise_orthogonalised_matrix(self, incoming):
+
+        print('Normalising')
+        # get the last eigenvector norm
+        self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
+
+        # divide all elements through the respective vector norm.
+        for col in range(self.pca.G.shape[1]):
+            for row in range(self.pca.G.shape[0]):
+                self.pca.G[row, col] = self.pca.G[row, col] / self.all_global_eigenvector_norms[col]
+
+        # reset eigenvector norms
+        # Store current eigenvalue guess
+        self.pca.S = copy.deepcopy(self.all_global_eigenvector_norms)
+
+        self.current_vector = 0
+        self.all_global_eigenvector_norms = []
+        self.orthonormalisation_done = False
+        self.computation_done = True
+        self.send_data = False
+        print('End normalising')
+
+    def compute_projections(self):
+        self.pca.projections = np.dot(self.tabdata.scaled.T, self.pca.H)
+        self.computation_done = True
+        self.send_data = False
+
+    def save_projections(self):
+        self.pca.save_projections(self.projection_file, sep=self.sep)
+        self.computation_done = True
+        self.send_data = False
+
+
+

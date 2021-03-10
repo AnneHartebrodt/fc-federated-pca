@@ -44,11 +44,6 @@ class TabData:
             index = 0
         else:
             index = None
-        print('reading')
-        print(filename)
-        print(header)
-        print(index)
-        print(sep)
         try:
             data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=sep, index_col=index)
             sample_ids = data.index

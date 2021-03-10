@@ -1,5 +1,8 @@
 import app.TabData as TabData
 import app.PCA.shared_functions as sh
+import json
+import pandas as pd
+import copy
 
 class SVD:
     def __init__(self, H, G, S, tabdata: 'TabData', k: int):
@@ -8,6 +11,8 @@ class SVD:
         self.S = S
         self.tabdata = tabdata
         self.k = k
+        self.previous_h = copy.deepcopy(H)
+        self.projections = None
 
     @classmethod
     def init_random(cls,  tabdata, k=10) -> 'SVD':
@@ -45,3 +50,22 @@ class SVD:
     def from_json(cls, json_file) -> 'SVD':
         # TODO: implement this
         return (None, None, None, None, None)
+
+
+
+    def to_json(self):
+
+        return True
+
+    def to_csv(self, left_eigenvector_file, right_eigenvector_file, eigenvalue_file, sep='\t'):
+        try:
+            pd.DataFrame(self.H).to_csv(left_eigenvector_file, sep=sep, header=False, index=False)
+            pd.DataFrame(self.G).to_csv(right_eigenvector_file, sep=sep, header=False, index=False)
+            pd.DataFrame(self.S).to_csv(eigenvalue_file, sep=sep, header=False, index=False)
+        except:
+            print('Saving data failed')
+
+    def save_projections(self, projection_file, sep='\t'):
+        pd.DataFrame(self.projections).to_csv(projection_file, sep=sep, header=False, index = False)
+
+
