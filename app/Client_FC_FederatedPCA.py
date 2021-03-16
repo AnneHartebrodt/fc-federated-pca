@@ -14,22 +14,34 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         FCFederatedPCA.__init__(self)
 
     def finalize_parameter_setup(self):
-        if self.center and self.scale_variance:
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
-                                                 Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
-                                                 Step.SCALE_TO_UNIT_VARIANCE,  Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
-                                                 Step.COMPUTE_G_LOCAL]
-        elif self.center:
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
+        if self.scale_dim == 'rows':
+            if self.center and self.scale_variance:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
+                                                     Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
+                                                     Step.SCALE_TO_UNIT_VARIANCE,  Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
+                                                     Step.COMPUTE_G_LOCAL]
+            elif self.center:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
+                                                     Step.SAVE_SCALED_DATA,
+                                                     Step.INIT_POWER_ITERATION,
+                                                     Step.COMPUTE_G_LOCAL]
+
+            elif self.scale_variance:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
+                                                     Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
+                                                     Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
+                                                     Step.COMPUTE_G_LOCAL]
+            else:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
+                                                     Step.INIT_POWER_ITERATION,
+                                                     Step.COMPUTE_G_LOCAL]
+        elif self.scale_dim == 'columns':
+            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.SCALE_LOCALLY,
                                                  Step.SAVE_SCALED_DATA,
                                                  Step.INIT_POWER_ITERATION,
                                                  Step.COMPUTE_G_LOCAL]
-
-        elif self.scale_variance:
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
-                                                 Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
-                                                 Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
-                                                 Step.COMPUTE_G_LOCAL]
+        else:
+            print('No scaling')
         self.computation_done = True
         print('[API] [CLIENT] /setup config done!')
         # if self.algorithm == 'power_iteration':
@@ -39,8 +51,8 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
     def compute_local_sums(self):
         try:
-            sums = np.sum(self.tabdata.data, axis=0)
-            outdata = {'sums': sums, 'sample_count': self.tabdata.row_count}
+            sums = np.sum(self.tabdata.scaled, axis=0)
+            outdata = {'sums': sums, 'sample_count': self.tabdata.col_count}
             self.out = outdata
             self.send_data = True
             self.computation_done = True
@@ -51,20 +63,24 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         return True
 
     def compute_local_sum_of_squares(self):
-        vars = np.sum(np.square(self.tabdata.data), axis=0)
-        outdata = {'sums': vars, 'sample_count': self.tabdata.row_count}
-        self.out = outdata
-        self.send_data = True
-        self.computation_done = True
+        try:
+            vars = np.sum(np.square(self.tabdata.scaled), axis=0)
+            outdata = {'sums': vars, 'sample_count': self.tabdata.col_count}
+            self.out = outdata
+            self.send_data = True
+            self.computation_done = True
+        except:
+            print('Scaling locally failed')
         return True
 
     def compute_h(self, incoming, client_id):
             # Compute dot product of data and G_i
-        print('Aggregating')
+        print('Computing H')
         self.pca.G = incoming['g_matrices'][client_id]
         self.pca.S = incoming['eigenvalues']
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        print('Aggregation done')
+        #print(self.pca.H)
+        print('...done')
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = True
@@ -74,6 +90,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         # this is the case for federated PCA and the first iteration
         # of centralised PCA
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+        #print(self.pca.H)
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = True
@@ -93,7 +110,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
                 if self.show_result:
                     self.step_queue = self.step_queue + [Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
-                                                         Step.SHOW_RESULT, Step.FINALIZE]
+                                                         Step.SHOW_RESULT]
                 else:
                     self.step_queue = self.step_queue + [Step.FINALIZE]
 
@@ -111,6 +128,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
             self.send_data = True
             self.computation_done = True
             self.out = {'g_local': self.pca.G}
+        print(self.step_queue)
         return True
 
 
@@ -169,6 +187,18 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         self.out = {'local_conorms': self.local_vector_conorms}
         self.computation_done = True
         self.send_data = True
+        return True
+
+    def init_rerun(self):
+        # remove outliers from data
+        # copy svd object without samples
+        # I guess technically data should be rescaled.
+        # TODO rescale data.
+        self.tabdata.scaled = np.delete(self.tabdata.scaled, self.outliers, axis=1)
+        self.pca.G = np.delete(self.pca.G, self.outliers, axis=0)
+        self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
+        # reinit power iteration
+        self.init_power_iteration()
         return True
 
 

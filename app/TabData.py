@@ -3,6 +3,8 @@ import scipy as sc
 import pandas as pd
 import app.PCA.spreadsheet_import as spi
 import traceback
+import copy
+
 class TabData:
     def __init__(self, data, columns, rows, scaled):
         self.data = data
@@ -26,7 +28,7 @@ class TabData:
         return cls(None, None, None, None)
 
     @classmethod
-    def from_file(cls, filename, header=True, index=True, sep ='\t') -> 'TabData':
+    def from_file(cls, filename, header=True, index=True, sep ='\t', keep_original=True, federated_dimension='columns') -> 'TabData':
         """
 
         :param filename:
@@ -45,12 +47,28 @@ class TabData:
         else:
             index = None
         try:
-            data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=sep, index_col=index)
+            print(filename)
+            data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=sep, index_col=index, engine='python')
+            if data.shape[1] == 0:
+                print('Suspiciously few columns ... using sniffer.')
+                data = pd.read_csv(filepath_or_buffer=filename, header=header, sep=None, index_col=index, engine='python')
             sample_ids = data.index
             variable_names = data.columns.values
-            data = data.values
+            if keep_original:
+                data = data.values
+                scaled = copy.deepcopy(data)
+            else:
+                scaled = data.values
+                data = None
+
+            #make sure the federated dimension are the columns.
+            if federated_dimension == 'rows':
+                data = data.T
+                scaled = scaled.T
+                return cls(data, sample_ids, variable_names, scaled)
+            else:
+                return cls(data, variable_names, sample_ids, scaled)
         except Exception:
-            traceback.print_exc()
-        #data, rows, columns = spi.data_import(filename, header=header, rownames=index, sep=sep)
-        return cls(data, variable_names, sample_ids, None)
+            print("Data loading failed")
+
 

@@ -5,15 +5,33 @@
         <h2>Global Parameters</h2>
         <p><b># of PCs: </b> {{ pcs }}</p>
     </div>
-    <div>
-        <p>Use 'lasso select' to select outliers. </p>
-        <p>Click the 'Done!' button to submit your choice. You do not have to select outliers.</p>
+    <div> Click on data points or use 'lasso select'. Click the rerun button to remove the outliers from the data and
+        restart the calculator.
     </div>
 {% endblock %}
 {% block result %}
-    <div class="chart" id="bargraph"></div>
-    <!---<input type="button" value="Rerun" id="calc" class="my-button">--->
-    <input type="button" value="Save and shutdown" id="calc2" class="my-button-shutdown">
+    <input type="button" value="Calculate" id="calc" class="my-button">
+    <script>
+        function addSubmit() {
+            console.log('Clicked the button ajax 1')
+            console.log('selected')
+            var remove = {'selected': selected}
+            $.ajax({
+                url: "./rerun",
+                type: "POST",
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(remove),
+                dataType: "json",
+                success: window.location.replace('./loading')
+            });
+
+        }
+
+        $('.my-button').on('click', addSubmit);
+    </script>
+       <div class="chart" id="bargraph"></div>
+
+
     <script>
         myPlot = document.getElementById('bargraph')
         var graphs = {{plot | safe}};
@@ -50,36 +68,20 @@
             Plotly.restyle(myPlot, 'marker.color', [colors], [0]);
 });
     </script>
-    <script>
-        function addSubmit() {
-            var remove = {'selected': selected}
-            $.ajax({
-                url: "./shutdown",
-                type: "POST",
-                contentType: 'application/json; charset=utf-8',
-                data: JSON.stringify(remove),
-                dataType: "json",
-                success: window.location.replace('./loading')
-            });
 
-        }
 
-        $('.my-button-shutdown').on('click', addSubmit);
-    </script>
-<script>
-        function addSubmit() {
-            var remove = {'selected': selected}
-            $.ajax({
-                url: "./rerun",
-                type: "POST",
-                contentType: 'application/json; charset=utf-8',
-                data: JSON.stringify(remove),
-                dataType: "json",
-                success: window.location.replace('./loading')
-            });
+    <!--   <script>
+           //Check if rerun has been triggered by the coordinator
+           var intervalID = window.setInterval(enable_rerun, 10000);
 
-        }
-
-        $('.my-button').on('click', addSubmit);
-    </script>
+           function enable_rerun() {
+               $.getJSON("./rerun_client",
+                   function (data) {
+                       console.log(data.rerun)
+                       if (data.rerun) {
+                           document.getElementById("calc").disabled = false;
+                       }
+                   });
+           }
+       </script> -->
 {% endblock %}

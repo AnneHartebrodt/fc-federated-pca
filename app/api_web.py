@@ -1,13 +1,17 @@
-from bottle import Bottle, jinja2_template as template, redirect, TEMPLATE_PATH, static_file, get, request
+from bottle import Bottle, jinja2_template as template, jinja2_view as view, redirect, TEMPLATE_PATH, static_file, get, request
 from .logic import logic
 import yaml
 from app.params import OUTPUT_DIR
 import os.path as op
-
+import jsonpickle
 web_server = Bottle()
 TEMPLATE_PATH.insert(0, 'templates')
-
-
+import plotly
+import plotly.graph_objs as go
+import pandas as pd
+import json
+import numpy as np
+from app.Steps import Step
 
 # CAREFUL: Do NOT perform any computation-related tasks inside these methods, nor inside functions called from them!
 # Otherwise your app does not respond to calls made by the FeatureCloud system quickly enough
@@ -32,7 +36,25 @@ def root():
         print('Default')
         return template('loading.html')
 
+def create_plot():
 
+
+    N = 40
+    x = np.linspace(0, 1, N)
+    y = np.random.randn(N)
+    df = pd.DataFrame({'x': x, 'y': y}) # creating a sample dataframe
+
+
+    data = [
+        go.Bar(
+            x=df['x'], # assign x as the dataframe column 'x'
+            y=df['y']
+        )
+    ]
+
+    graphJSON = json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder)
+
+    return graphJSON
 
 @web_server.route('/setup', methods=['GET'])
 def setup():
@@ -44,7 +66,6 @@ def setup():
     else:
         return template('loading.html')
 
-
 @web_server.route('/result', methods=['GET'])
 def result():
     print("VISUALIZE results")
@@ -55,20 +76,18 @@ def result():
         print("[WEB] visualise results")
 
         x = logic.svd.pca.projections[:, 0:1].flatten().tolist()
-        print(x)
         y = logic.svd.pca.projections[:, 1:2].flatten().tolist()
-        print(y)
-        #if 1==2:
-         #   colors = rget('client_indices_as_vector')
-         #   colors = color_picker(colors)
-        #else:
-        colors = ['1']*len(y)
-        colors = color_picker(colors)
-        point_ids = range(len(y))
-        calculate_button_enabled = button_enabled()
-        return template("result.html", x={'x': x }, y={'y': y }, color={'color':colors}, point_ids={'point_ids': point_ids},
-                               is_coordinator =logic.coordinator, pcs=logic.svd.k,
-                               allow_rerun={'allow_rerun': calculate_button_enabled})
+        data = [
+            go.Scatter(
+                mode='markers',
+                x=x,  # assign x as the dataframe column 'x'
+                y=y
+            )
+        ]
+
+        graphJSON = json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder)
+
+        return template("result.html", plot = graphJSON)
     except:
         return template("result.html")
 
@@ -101,42 +120,27 @@ def button_enabled():
     return enabled
 
 
-# @web_server.route('/rerun', methods=['POST'])
-# def rerun():
-#     print("[WEB] Outliers selected")
-#     selected = request.json['selected']
-#     print(selected)
-#     if rexists('outlier'):
-#         rset('outlier', rget('outlier') + selected)
-#     else:
-#         rset('outlier', selected)
-#     tasks.enqueue(continue_after_user_interaction)
-#     return template('loading.html')
+@web_server.route('/rerun', method='POST')
+def rerun():
+    print("[WEB] Outliers selected")
+    print(request.json)
+    selected = request.json['selected']
+    logic.svd.outliers = logic.svd.outliers + selected
+    # advance the loop
+    logic.step = Step.SAVE_OUTLIERS
+    logic.svd.step_queue = logic.svd.step_queue + [Step.INIT_RERUN]
+    return template('loading.html')
 
-
-# @web_server.route('/rerun_client', methods=['GET'])
-# def rerun_client():
-#     if rexists('rerun'):
-#         return jsonify(rerun=rget('rerun'))
-#     else:
-#         return jsonify(rerun=False)
-#
-#
-# @web_server.route('/redirect_visualize', methods=['GET'])
-# def redirect_visualize():
-#     print('trying to redirect')
-#     if rget('finished'):
-#         return jsonify(redir=True)
-#     else:
-#         return jsonify(redir=False)
-#
-
-# def set_boolean(name):
-#     if request.form.get(name) is not None:
-#         rset(name, True)
-#     else:
-#         rset(name, False)
-
+@web_server.route('/shutdown', method='POST')
+def shutdown():
+    print("[WEB] Outliers selected")
+    print(request.json)
+    selected = request.json['selected']
+    logic.svd.outliers = logic.svd.outliers + selected
+    # advance the loop
+    logic.step = Step.SAVE_OUTLIERS
+    logic.svd.step_queue = logic.svd.step_queue + [Step.FINALIZE]
+    return template('loading.html')
 
 @web_server.route('/run', method='POST')
 def run():
@@ -155,6 +159,7 @@ def run():
     parameter_list['algorithm']['algorithm'] = request.forms.get('algorithm')
     parameter_list['algorithm']['qr'] = 'centralised'
     parameter_list['algorithm']['max_iterations'] = int(request.forms.get('max_iterations'))
+    parameter_list['algorithm']['epsilon'] = float(request.forms.get('epsilon'))
 
     parameter_list['settings'] = {}
     parameter_list['settings']['rownames'] = bool(request.forms.get('rownames'))

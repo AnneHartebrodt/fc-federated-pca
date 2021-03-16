@@ -24,11 +24,18 @@ class FCFederatedPCA:
         self.state = 'waiting_for_start' # this is the inital state
         self.iteration_counter = 0
         self.converged = False
+        self.outliers = []
 
 
     def next_state(self):
         self.state = self.step_queue.pop(0)
         return self.state
+
+    def peek_next_state(self):
+        try:
+            return self.step_queue[0]
+        except:
+            print('No more states')
 
     def get_state(self):
         return self.get_state()
@@ -72,21 +79,26 @@ class FCFederatedPCA:
                 self.algorithm =  parameter_list['algorithm']['algorithm']
                 self.federated_qr = parameter_list['algorithm']['qr']
                 self.max_iterations = parameter_list['algorithm']['max_iterations']
-                if parameter_list['settings']['rownames']:
-                    self.has_rownames = True
-                else:
-                    self.has_rownames = False
-                if parameter_list['settings']['colnames']:
-                    self.has_colnames = True
-                else:
-                    self.has_colnames = False
-                self.sep =  parameter_list['settings']['delimiter']
+                #print(parameter_list['algorithm']['epsilon'])
+                #self.epsilon = float(parameter_list['algorithm']['epsilon'])
+                print('set epsilon')
+                self.epsilon = 1e-9
+                print('done')
+                self.has_rownames = parameter_list['settings']['rownames']
+                self.has_colnames = parameter_list['settings']['colnames']
+
+                print('colnames set')
+                self.sep = parameter_list['settings']['delimiter']
+                print('delimiter set')
+                print(parameter_list['settings'])
+                self.federated_dimensions = parameter_list['settings']['federated_dimension']
 
                 print('algo settings')
                 print(parameter_list['scaling'])
                 self.center = parameter_list['scaling']['center']
                 self.scale_variance = parameter_list['scaling']['scale_variance']
                 self.transform = parameter_list['scaling']['transform']
+                self.scale_dim = parameter_list['scaling']['scale_dim']
 
 
                 print('scaling')
@@ -110,7 +122,7 @@ class FCFederatedPCA:
     def read_input_files(self):
         try:
 
-            self.tabdata = TabData.from_file(self.input_file, header = self.has_colnames,
+            self.tabdata = TabData.from_file(self.input_file, header=self.has_colnames,
                                              index=self.has_rownames, sep=self.sep)
             self.computation_done = True
         except Exception as e:
@@ -128,10 +140,23 @@ class FCFederatedPCA:
             traceback.print_exc()
         return True
 
+    def scale_locally(self):
+        if self.center:
+            means = np.mean(self.tabdata.scaled, axis=1)
+            means = np.atleast_2d(means).T
+            self.tabdata.scaled = self.tabdata.scaled - means
+        if self.scale_variance:
+            vars = np.var(self.tabdata.scaled, axis=1)
+            vars[vars==0]=1
+            vars = np.atleast_2d(vars).T
+            self.tabdata.scaled = self.tabdata.scaled / vars
+        self.computation_done = True
+        self.send_data = False
+
     def scale_data_to_unit_variance(self, incoming):
         try:
             vars = incoming['vars']
-            self.tabdata.scaled = self.tabdata.data/vars
+            self.tabdata.scaled = self.tabdata.data / vars
             self.computation_done = True
             self.send_data = False
         except Exception as e:
@@ -153,15 +178,15 @@ class FCFederatedPCA:
 
     def save_scaled_data(self):
         saveme = pd.DataFrame(self.tabdata.scaled)
-        saveme.columns = self.tabdata.columns
-        saveme.rows = self.tabdata.rows
-        saveme.to_csv(self.scaled_data_file, header=True, index=True, sep='\t')
+        #saveme.columns = self.tabdata.columns
+        #saveme.rows = self.tabdata.rows
+        saveme.to_csv(self.scaled_data_file, header=False, index=False, sep='\t')
         self.computation_done = True
         self.send_data = False
         return True
 
     def save_pca(self):
-        self.pca.to_csv(self.left_eigenvector_file,self.right_eigenvector_file, self.eigenvalue_file)
+        self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False
 
@@ -200,14 +225,26 @@ class FCFederatedPCA:
         print('End normalising')
 
     def compute_projections(self):
-        self.pca.projections = np.dot(self.tabdata.scaled.T, self.pca.H)
+        try:
+            self.pca.projections = np.dot(self.tabdata.scaled.T, self.pca.H)
+            self.computation_done = True
+            self.send_data = False
+        except:
+            print('Failed computing projections')
+
+    def save_projections(self):
+        print(self.projection_file)
+        self.pca.save_projections(self.projection_file, sep='\t')
         self.computation_done = True
         self.send_data = False
 
-    def save_projections(self):
-        self.pca.save_projections(self.projection_file, sep=self.sep)
+    def save_outliers(self):
+        if len(self.outliers) > 0:
+            ol = self.tabdata.rows[self.outliers]
+            pd.DataFrame(ol).to_csv(op.join(OUTPUT_DIR, 'outliers.tsv'), header=False, sep='\t')
         self.computation_done = True
         self.send_data = False
+
 
 
 

@@ -53,7 +53,6 @@
                 <label> Algorithm</label><br>
                 <select name="algorithm" id="algorithm">
                     <option value="subspace-iteration">Subspace Iteration</option>
-                     <option value="single-round">Single round PCA</option>
                      <option value="power-iteration">Power Iteration</option>
                 </select><br><br>
 
@@ -61,6 +60,8 @@
                 <input type="number" class="form-control" min="1" value=10 name="pcs"><br><br>
                 <label> Max. iterations </label><br>
                 <input type="number" class="form-control" min="1" value=2000 name="max_iterations"><br>
+                <label> Epsilon </label><br>
+                <input type="number" class="form-control" min="1e-12" value=1e-9 name="epsilon"><br>
 
             </div>
             <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">

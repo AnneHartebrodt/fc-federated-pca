@@ -2,6 +2,8 @@ import shutil
 import threading
 import time
 import jsonpickle
+import jsonpickle.ext.numpy as jsonpickle_numpy
+jsonpickle_numpy.register_handlers()
 import yaml
 from app.algo import local_computation, global_aggregation
 from app.Aggregator_FC_Federated_PCA import AggregatorFCFederatedPCA
@@ -74,7 +76,15 @@ class AppLogic:
         incoming = data.read()
         # Here we use a dictionary because some information is client
         # specific
-        self.data_incoming[client] = incoming
+        incoming = jsonpickle.decode(incoming)
+        step = incoming['step']
+        print(self.data_incoming.keys())
+        if step in self.data_incoming.keys():
+            self.data_incoming[step][client] = incoming
+        else:
+            self.data_incoming[step] = {}
+            self.data_incoming[step][client] = incoming
+
 
     def handle_outgoing(self):
         print("Process outgoing data...", flush=True)
@@ -87,9 +97,9 @@ class AppLogic:
     def app_flow(self):
         # This method contains a state machine for the participant and coordinator instance
         while True:
+            print(self.step)
             if self.step == Step.LOAD_CONFIG:
                 try:
-                    print(self.step)
                     self.progress = "initializing..."
                     print("[CLIENT] Parsing parameter file...", flush=True)
                     if self.id is not None:  # Test is setup has happened already
@@ -105,19 +115,18 @@ class AppLogic:
                     print('Error parsing parameter file!')
 
             elif self.step == Step.WAIT_FOR_PARAMS:
-                print('CLIENT waiting for parameters')
-                if len(self.data_incoming) > 0:
+                wait_for = Step.LOAD_CONFIG.value
+                print('CLIENT waiting for parameters '+ str(wait_for))
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     try:
-                        print(self.step)
-                        key = list(self.data_incoming.keys())[0]
-                        incoming = jsonpickle.decode(self.data_incoming[key])
-                        self.data_incoming = {}
+                        key = list(self.data_incoming[wait_for].keys())[0]
+                        incoming = self.data_incoming[wait_for][key]
+                        self.data_incoming[wait_for] = {}
                         self.svd.set_parameters(incoming)
                     except:
                         print("Error")
                     
             elif self.step == Step.READ_DATA:
-                print(self.step)
                 self.progress = "read input..."
                 print("[CLIENT] Read input...", flush=True)
                 # Read the config file
@@ -132,28 +141,31 @@ class AppLogic:
                     print('Computing local sums failed')
 
             elif self.step == Step.COMPUTE_GLOBAL_MEANS:
-                if len(self.data_incoming) == len(self.clients):
-                    print(self.step)
+                wait_for = Step.COMPUTE_LOCAL_SUMS.value
+                print('CLIENT waiting for parameters ' + str(wait_for))
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) == len(self.clients):
                     print("[COORDINATOR] Received data of all participants.", flush=True)
                     print("[COORDINATOR] Aggregate results...", flush=True)
                     # Decode received data of each client
-                    incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming.values()]
+                    incoming = [client_data for client_data in self.data_incoming[wait_for].values()]
                     # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.compute_global_means(incoming)
                     except:
                         print("Aggregation error")
 
             elif self.step == Step.SCALE_DATA:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.COMPUTE_GLOBAL_MEANS.value
+                print('CLIENT waiting for parameters ' + str(wait_for))
+
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.scale_data(incoming)
                     except:
@@ -161,20 +173,20 @@ class AppLogic:
 
             elif self.step == Step.COMPUTE_LOCAL_SUM_OF_SQUARES:
                 try:
-                    print(self.step)
                     self.svd.compute_local_sum_of_squares()
                 except:
                     print('Computing local sum of squares failed')
 
             elif self.step == Step.AGGREGATE_SUM_OF_SQUARES:
-                if len(self.data_incoming) == len(self.clients):
-                    print(self.step)
+                wait_for = Step.COMPUTE_LOCAL_SUM_OF_SQUARES.value
+                print('CLIENT waiting for parameters ' + str(wait_for))
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) == len(self.clients):
                     print("[COORDINATOR] Received data of all participants.", flush=True)
                     print("[COORDINATOR] Aggregate results...", flush=True)
                     # Decode received data of each client
-                    incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming.values()]
+                    incoming = [client_data for client_data in self.data_incoming[wait_for].values()]
                     # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.compute_global_sum_of_squares(incoming)
                     except:
@@ -182,44 +194,48 @@ class AppLogic:
 
 
             elif self.step == Step.SCALE_TO_UNIT_VARIANCE:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.AGGREGATE_SUM_OF_SQUARES.value
+                print('CLIENT waiting for parameters ' + str(wait_for))
+
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.scale_data_to_unit_variance(incoming)
                     except:
                         print('scaling error')
 
+            elif self.step == Step.SCALE_LOCALLY:
+                self.svd.scale_locally()
+
             elif self.step == Step.SAVE_SCALED_DATA:
                 try:
-                    print(self.step)
                     self.svd.save_scaled_data()
                 except:
                     print('Saving data failed')
 
             elif self.step == Step.INIT_POWER_ITERATION:
                 try:
-                    print(self.step)
                     self.svd.pca = SVD.init_random(self.svd.tabdata, k=self.svd.k)
-                    print('object created')
+                    print('SVD init done')
                     self.svd.init_power_iteration()
                 except:
                     print('Power iteration initialisation failed')
 
             elif self.step == Step.COMPUTE_G_LOCAL:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.AGGREGATE_H.value
+                print('CLIENT waiting for parameters ' + str(wait_for))
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.compute_g(incoming)
                     except:
@@ -227,67 +243,71 @@ class AppLogic:
 
             elif self.step == Step.COMPUTE_H_LOCAL:
                 if self.svd.federated_qr:
-                    print(self.step)
                     try:
+                        print('Computing H')
                         self.svd.compute_h_local_g()
                     except:
                         print('H computation failed')
                 else:
-                    if len(self.data_incoming) > 0:
-                        print(self.step)
+                    wait_for = Step.ORTHONORMALISE_G.value
+                    if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                         # Decode broadcasted dnerdyata
-                        key = list(self.data_incoming.keys())[0]
-                        incoming = jsonpickle.decode(self.data_incoming[key])
+                        key = list(self.data_incoming[wait_for].keys())[0]
+                        incoming = self.data_incoming[wait_for][key]
                         # Empty incoming data
-                        self.data_incoming = {}
+                        self.data_incoming[wait_for] = {}
+                        #print(incoming)
                         try:
+                            print('COMPUTE H LOCAL')
                             self.svd.compute_h(incoming, self.id)
                         except:
                             print('H computation failed')
 
             elif self.step == Step.AGGREGATE_H:
-                if len(self.data_incoming) == len(self.clients):
-                    print(self.step)
+                if Step.COMPUTE_H_LOCAL.value in self.data_incoming.keys():
+                    wait_for = Step.COMPUTE_H_LOCAL.value
+                else:
+                    wait_for = Step.INIT_POWER_ITERATION.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) == len(self.clients):
                     print("[COORDINATOR] Received data of all participants.", flush=True)
                     print("[COORDINATOR] Aggregate results...", flush=True)
                     # Decode received data of each client
-                    incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming.values()]
+                    incoming = [client_data for client_data in self.data_incoming[wait_for].values()]
                     # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.aggregate_h(incoming)
                     except:
                         print('H aggregation failed')
 
             elif self.step == Step.ORTHONORMALISE_G:
-                if len(self.data_incoming) == len(self.clients):
-                    print(self.step)
-                    print("[COORDINATOR] Received data of all participants.", flush=True)
-                    print("[COORDINATOR] Aggregate results...", flush=True)
-                    # Decode received data of each client
-                    #incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                    # the parameters are client specific
-                    incoming = {}
-                    print(self.data_incoming)
-                    for i in self.data_incoming:
-                        incoming[i] = jsonpickle.decode(self.data_incoming[i])
-                    # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = {}
+                wait_for = Step.COMPUTE_G_LOCAL.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) == len(self.clients):
                     try:
+                        print("[COORDINATOR] Received data of all participants.", flush=True)
+                        print("[COORDINATOR] Aggregate results...", flush=True)
+                        # Decode received data of each client
+                        #incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
+                        # the parameters are client specific
+                        incoming = {}
+                        for i in self.data_incoming[wait_for]:
+                            incoming[i] = self.data_incoming[wait_for][i]
+                        # Empty the incoming data (important for multiple iterations)
+                        self.data_incoming[wait_for] = {}
                         self.svd.orthonormalise_g(incoming, self.clients)
                     except:
                         print('G orthonormalisation failed')
 
             elif self.step == Step.WAIT_FOR_G:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.ORTHONORMALISE_G.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.wait_for_g(incoming, self.id)
                     except:
@@ -295,81 +315,79 @@ class AppLogic:
 
             elif self.step == Step.COMPUTE_LOCAL_NORM:
                 try:
-                    print(self.step)
                     print('Computing local norms')
                     self.svd.compute_local_eigenvector_norm()
                 except:
                     print('Local norm computation failed')
 
             elif self.step == Step.COMPUTE_LOCAL_CONORM:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.AGGREGATE_NORM.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.calculate_local_vector_conorms(incoming)
                     except:
                         print('Local co-norm computation failed')
 
             elif self.step == Step.ORTHOGONALISE_CURRENT:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.AGGREGATE_CONORM.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.orthogonalise_current(incoming)
                     except:
                         print('Orthogonalisation failed')
 
             elif self.step == Step.AGGREGATE_NORM:
-                if len(self.data_incoming) == len(self.clients):
-                    print(self.step)
+                wait_for = Step.COMPUTE_LOCAL_NORM.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) == len(self.clients):
                     print("[COORDINATOR] Received data of all participants.", flush=True)
                     print("[COORDINATOR] Aggregate results...", flush=True)
                     # Decode received data of each client
                     # the parameters are client specific
-                    incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming.values()]
+                    incoming = [client_data for client_data in self.data_incoming[wait_for].values()]
                     # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.aggregate_eigenvector_norms(incoming)
                     except:
                         print("Eigenvector aggregatio failed")
 
             elif self.step == Step.AGGREGATE_CONORM:
-
-                if len(self.data_incoming) == len(self.clients):
-                    print(self.step)
+                wait_for = Step.COMPUTE_LOCAL_CONORM.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) == len(self.clients):
                     print("[COORDINATOR] Received data of all participants.", flush=True)
                     print("[COORDINATOR] Aggregate results...", flush=True)
                     # Decode received data of each client
                     #incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
                     # the parameters are client specific
-                    incoming = [jsonpickle.decode(client_data) for client_data in self.data_incoming.values()]
+                    incoming = [client_data for client_data in self.data_incoming[wait_for].values()]
                     # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.aggregate_conorms(incoming)
                     except:
                         print('Co-norm aggregation failed')
 
             elif self.step == Step.NORMALISE_G:
-                if len(self.data_incoming) > 0:
-                    print(self.step)
+                wait_for = Step.AGGREGATE_NORM.value
+                if wait_for in self.data_incoming.keys() and len(self.data_incoming[wait_for]) > 0:
                     print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                     # Decode broadcasted data
-                    key = list(self.data_incoming.keys())[0]
-                    incoming = jsonpickle.decode(self.data_incoming[key])
+                    key = list(self.data_incoming[wait_for].keys())[0]
+                    incoming = self.data_incoming[wait_for][key]
                     # Empty incoming data
-                    self.data_incoming = {}
+                    self.data_incoming[wait_for] = {}
                     try:
                         self.svd.normalise_orthogonalised_matrix(incoming)
                     except:
@@ -377,39 +395,46 @@ class AppLogic:
 
             elif self.step == Step.COMPUTE_PROJECTIONS:
                 try:
-                    print(self.step)
                     self.svd.compute_projections()
                 except:
                     print('Computation of projections failed.')
 
             elif self.step == Step.SAVE_PROJECTIONS:
-                try:
-                    print(self.step)
-                    self.svd.save_projections()
-                except:
-                    print('Saving of projections failed')
+                self.svd.save_projections()
 
             elif self.step == Step.SHOW_RESULT:
                 print('[CLIENT] Waiting for user interaction')
                 self.web_status = 'show_result'
 
+            elif self.step == Step.SAVE_OUTLIERS:
+
+                print('[CLIENT] User interaction done')
+                self.web_status = 'waiting'
+                self.svd.save_outliers()
+
             elif self.step == Step.SAVE_SVD:
                 try:
-                    print(self.step)
                     self.svd.save_pca()
                 except:
                     print('SVD saving failed')
 
+            elif self.step == Step.INIT_RERUN:
+                try:
+                    self.svd.rerun()
+                except:
+                    print('Rerun failed')
+
             elif self.step == Step.FINALIZE:
-                print(self.step)
+                wait_for = Step.FINALIZE.value
                 if self.coordinator:
-                    if len(self.data_incoming) == (len(self.clients)-1):
+                    if wait_for in self.data_incoming.keys() and \
+                            len(self.data_incoming[wait_for]) == (len(self.clients)-1):
                         self.status_finished = True
                         self.step = Step.FINISHED
                 else:
-                    self.data_outgoing = jsonpickle.encode(True)
+                    out = {'finished': True, 'step': Step.FINALIZE.value}
+                    self.data_outgoing = jsonpickle.encode(out)
                     self.status_available = True
-                    time.sleep(3)
                     self.status_finished = True
                     self.step = Step.FINISHED
 
@@ -422,25 +447,45 @@ class AppLogic:
 
             # Dispatch data if required
             if self.svd.computation_done:
-                self.svd.computation_done = False
-                # in the svd object
-                if self.svd.send_data:
-                    # Send data if required
-                    self.data_outgoing = jsonpickle.encode(self.svd.out)
-                    self.status_available = True
-                    if self.coordinator:
-                        self.data_incoming[self.id] = jsonpickle.encode(self.svd.out)
-                else:
-                    # Master just moves its local model to the inbox
-                    # for easy aggregation
-                    if self.svd.out is not None:
-                        self.data_incoming[self.id] = jsonpickle.encode(self.svd.out)
-                # reset the states
-                self.svd.out = None
-                self.svd.send_data = False
-                # the app orchestration status
-                #finally, increment the step
-                self.step = self.svd.next_state()
+                try:
+                    self.svd.computation_done = False
+                    # in the svd object
+                    # include the current step into the sent
+                    # data object
+
+                    if self.svd.send_data:
+                        # Send data if required
+                        #print(self.svd.out)
+                        st =self.step.value
+                        self.svd.out['step'] = st
+                        self.data_outgoing = jsonpickle.encode(self.svd.out)
+                        self.status_available = True
+                        if self.coordinator:
+                            if self.step.value in self.data_incoming.keys():
+                                self.data_incoming[st][self.id] = self.svd.out
+                            else:
+                                self.data_incoming[st] = {}
+                                self.data_incoming[st][self.id] = self.svd.out
+                    else:
+                        # Master just moves its local model to the inbox
+                        # for easy aggregation
+                        # dont encode because data is decoded upn arrival
+                        if self.svd.out is not None:
+                            st = self.step.value
+                            self.svd.out['step'] = st
+                            if self.step.value in self.data_incoming.keys():
+                                self.data_incoming[st][self.id] = self.svd.out
+                            else:
+                                self.data_incoming[st] = {}
+                                self.data_incoming[st][self.id] = self.svd.out
+                    # reset the states
+                    self.svd.out = None
+                    self.svd.send_data = False
+                    # the app orchestration status
+                    #finally, increment the step
+                    self.step = self.svd.next_state()
+                except:
+                    print('Dispatch failed')
             time.sleep(1)
 
 

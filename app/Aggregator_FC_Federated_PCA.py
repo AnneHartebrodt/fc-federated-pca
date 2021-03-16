@@ -12,22 +12,42 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         FCFederatedPCA.__init__(self)
 
     def finalize_parameter_setup(self):
-        if self.center and self.scale_variance:
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
-                                                 Step.COMPUTE_LOCAL_SUMS, Step.COMPUTE_GLOBAL_MEANS,
-                                                Step.SCALE_DATA,
-                                             Step.COMPUTE_LOCAL_SUM_OF_SQUARES, Step.AGGREGATE_SUM_OF_SQUARES,
-                                             Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
+        if self.scale_dim == 'rows':
+            if self.center and self.scale_variance:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
+                                                     Step.COMPUTE_LOCAL_SUMS, Step.COMPUTE_GLOBAL_MEANS,
+                                                    Step.SCALE_DATA,
+                                                 Step.COMPUTE_LOCAL_SUM_OF_SQUARES, Step.AGGREGATE_SUM_OF_SQUARES,
+                                                 Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
+                                                     Step.AGGREGATE_H,
+                                                     Step.COMPUTE_G_LOCAL]
+            elif self.center:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS,
+                                                 Step.COMPUTE_GLOBAL_MEANS,
+                                                 Step.SCALE_DATA, Step.SAVE_SCALED_DATA,Step.INIT_POWER_ITERATION,
+                                                     Step.AGGREGATE_H,
+                                                     Step.COMPUTE_G_LOCAL]
+            elif self.scale_variance:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
+                                                     Step.COMPUTE_LOCAL_SUM_OF_SQUARES, Step.AGGREGATE_SUM_OF_SQUARES,
+                                                     Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA,
+                                                     Step.INIT_POWER_ITERATION,
+                                                     Step.AGGREGATE_H,
+                                                     Step.COMPUTE_G_LOCAL
+                                                     ]
+            else:
+                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
+                                                     Step.INIT_POWER_ITERATION,
+                                                     Step.AGGREGATE_H,
+                                                     Step.COMPUTE_G_LOCAL]
+        elif self.scale_dim == 'columns':
+            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.SCALE_LOCALLY,
+                                                 Step.SAVE_SCALED_DATA,
+                                                 Step.INIT_POWER_ITERATION,
                                                  Step.AGGREGATE_H,
                                                  Step.COMPUTE_G_LOCAL]
-        elif self.center:
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS,
-                                             Step.COMPUTE_GLOBAL_MEANS,
-                                             Step.SCALE_DATA, Step.SAVE_SCALED_DATA, Step.FINALIZE]
-        elif self.scale_variance:
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
-                                                 Step.COMPUTE_LOCAL_SUM_OF_SQUARES, Step.AGGREGATE_SUM_OF_SQUARES,
-                                                 Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA]
+        else:
+            print('No scaling')
 
         # No user interaction required, set available to true
         # master still sends configuration to all clients.
@@ -45,12 +65,26 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
         
     def compute_local_sums(self):
-        sums = np.sum(self.tabdata.data, axis=0)
-        outdata = {'sums': sums, 'sample_count': self.tabdata.row_count}
-        # Difference to the client: Do not set available to true.
-        # Data is not to be sent
-        self.out = outdata
-        self.computation_done = True
+        try:
+            sums = np.sum(self.tabdata.scaled, axis=0)
+            outdata = {'sums': sums, 'sample_count': self.tabdata.col_count}
+            self.out = outdata
+            self.send_data = True
+            self.computation_done = True
+        except Exception as e:
+            print('[API] computing local sums failed')
+
+        return True
+
+    def compute_local_sum_of_squares(self):
+        try:
+            vars = np.sum(np.square(self.tabdata.scaled), axis=0)
+            outdata = {'sums': vars, 'sample_count': self.tabdata.col_count}
+            self.out = outdata
+            self.send_data = True
+            self.computation_done = True
+        except:
+            print('Scaling locally failed')
         return True
 
     def compute_global_means(self, data):
@@ -63,13 +97,6 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.out = {'means': means}
         self.computation_done = True
         self.send_data = True
-        return True
-
-    def compute_local_sum_of_squares(self):
-        vars = np.sum(np.square(self.tabdata.data), axis=0)
-        outdata = {'sums': vars, 'sample_count': self.tabdata.row_count}
-        self.out = outdata
-        self.computation_done = True
         return True
 
     def compute_global_sum_of_squares(self, incoming):
@@ -89,10 +116,11 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         # this is the case for federated PCA and the first iteration
         # of centralised PCA
         # Compute dot product of data and G_i
+        print('Computing H locally')
         self.pca.G = incoming['g_matrices'][client_id]
         self.pca.S = incoming['eigenvalues']
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-
+        print('Done!!!')
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = False
@@ -101,6 +129,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
     def compute_h_local_g(self):
         # this is the case for federated PCA and the first iteration
         # of centralised PCA
+        print('Compute H')
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
@@ -121,6 +150,13 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
                     self.step_queue = self.step_queue + [Step.COMPUTE_LOCAL_NORM, Step.AGGREGATE_NORM,
                                        Step.COMPUTE_LOCAL_CONORM, Step.AGGREGATE_CONORM, Step.ORTHOGONALISE_CURRENT] * (self.k - 1) + \
                                       [Step.COMPUTE_LOCAL_NORM, Step.AGGREGATE_NORM, Step.NORMALISE_G] + [Step.SAVE_SVD]
+
+                    if self.show_result:
+                        self.step_queue = self.step_queue + [Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
+                                                             Step.SHOW_RESULT, Step.FINALIZE]
+                    else:
+                        self.step_queue = self.step_queue + [Step.FINALIZE]
+
                 else:
                     self.step_queue = self.step_queue + \
                                       [Step.COMPUTE_LOCAL_NORM, Step.AGGREGATE_NORM,
@@ -128,11 +164,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
                                       [Step.COMPUTE_LOCAL_NORM, Step.AGGREGATE_NORM, Step.NORMALISE_G] + \
                                       [Step.COMPUTE_H_LOCAL, Step.AGGREGATE_H, Step.COMPUTE_G_LOCAL]
                     print(self.step_queue)
-                if self.show_result:
-                    self.step_queue = self.step_queue + [Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
-                                                         Step.SHOW_RESULT, Step.FINALIZE]
-                else:
-                    self.step_queue = self.step_queue + [Step.FINALIZE]
+
                 # next local step is to follow!
                 self.computation_done = True
         else:
@@ -144,6 +176,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
             self.send_data = False
             self.computation_done = True
             self.out = {'g_local': self.pca.G}
+        print(self.step_queue)
         return True
 
 
@@ -165,7 +198,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         print(self.iteration_counter)
         # The previous H matrix is stored in the global variable
         print('orthonormalised')
-        converged, deltas = eigenvector_convergence_checker(global_HI_matrix, self.pca.previous_h, tolerance=1e-9)
+        print(self.epsilon)
+        converged, deltas = eigenvector_convergence_checker(global_HI_matrix, self.pca.previous_h, tolerance=self.epsilon)
         print(converged)
         if self.iteration_counter == self.max_iterations or converged:
             self.converged = True
@@ -219,6 +253,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
     def init_power_iteration(self):
         self.iteration_counter = 0
         self.converged = False
+        print(self.pca.G.shape)
+        print(self.tabdata.scaled.shape)
         self.pca.previous_h = self.pca.H
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         self.out = {'local_h': self.pca.H}
@@ -272,9 +308,9 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         # append the lastly calculated norm to the list of global norms
         self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
         print('Computing local co norms')
-        print(vector_conorms)
+        #print(vector_conorms)
         print(self.current_vector)
-        print(self.pca.G)
+        #print(self.pca.G)
         for cvi in range(self.current_vector):
             vector_conorms.append(np.dot(self.pca.G[:, cvi], self.pca.G[:, self.current_vector]) / self.all_global_eigenvector_norms[cvi])
         print('done')
@@ -286,3 +322,14 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.send_data = False
         return True
 
+    def init_rerun(self):
+        # remove outliers from data
+        # copy svd object without samples
+        # I guess technically data should be rescaled.
+        # TODO rescale data.
+        self.tabdata.scaled = np.delete(self.tabdata.scaled, self.outliers, axis=1)
+        self.pca.G = np.delete(self.pca.G, self.outliers, axis=0)
+        self.step_queue = self.step_queue + [Step.AGGREGATE_H, Step.COMPUTE_G_LOCAL]
+        # reinit power iteration
+        self.init_power_iteration()
+        return True

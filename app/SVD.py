@@ -66,6 +66,6 @@ class SVD:
             print('Saving data failed')
 
     def save_projections(self, projection_file, sep='\t'):
-        pd.DataFrame(self.projections).to_csv(projection_file, sep=sep, header=False, index = False)
-
+        save = pd.DataFrame(self.projections)
+        save.to_csv(projection_file, sep=str(sep), header=False, index=False)
 

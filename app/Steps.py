@@ -7,6 +7,7 @@ class Step(Enum):
     COMPUTE_LOCAL_SUMS = 'compute_local_sums'
     COMPUTE_GLOBAL_MEANS =  'compute_global_means'
     SCALE_DATA = 'scale_data'
+    SCALE_LOCALLY = 'scale_locally'
     COMPUTE_LOCAL_SUM_OF_SQUARES = 'compute_local_sum_of_squares'
     AGGREGATE_SUM_OF_SQUARES = 'aggregated_sum_of_squares'
     SCALE_TO_UNIT_VARIANCE = 'scale_to_unit_variance'
@@ -23,6 +24,8 @@ class Step(Enum):
     SHOW_RESULT = 'show result'
     COMPUTE_PROJECTIONS = 'compute_projections'
     SAVE_PROJECTIONS = 'save_projections'
+    SAVE_OUTLIERS = 'Save outliers'
+    INIT_RERUN = 'INIT_RERUN'
 
 
     COMPUTE_LOCAL_NORM = 'Compute local norm'
@@ -31,3 +34,5 @@ class Step(Enum):
     AGGREGATE_CONORM = 'Aggregate Conorm'
     ORTHOGONALISE_CURRENT = "orthogonalise current"
     NORMALISE_G = 'Normalise orthongonal matrix'
+
+    COMPUTING = 'COMPUTINg'

@@ -4,5 +4,5 @@ numpy # for mathematical computations
 pyyaml # to read config file
 jinja2 # templating engine
 scipy
-pandas
-
+pandas>=0.24
+plotly
