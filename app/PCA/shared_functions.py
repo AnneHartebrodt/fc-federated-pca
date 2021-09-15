@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sc
 import scipy.sparse.linalg as lsa
+import scipy.sparse as scis
 
 
 
@@ -10,6 +11,9 @@ def svd_sub(cov, ndims):
     # slower
     # covariance matrix is positive semi definite so SVD= Eigenvalue decomposition
     # print(nd)
+
+    # assure sparseness
+    cov = scis.coo_matrix.asfptype(cov)
     nd = min(cov.shape[1] - 1, ndims)
     V, S, W = sc.sparse.linalg.svds(cov, nd)
     # Sparse returns eigenvalues in ascending order

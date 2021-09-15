@@ -28,8 +28,6 @@ def root():
     """
     if logic.web_status == 'setup_via_user_interface':
         return template('start_coordinator.html', is_coordinator=logic.coordinator)
-    elif logic.web_status == 'show_result':
-        return redirect("/result")
     elif logic.web_status == 'final':
         return redirect('/shutdown')
     else:
@@ -120,17 +118,6 @@ def button_enabled():
     return enabled
 
 
-@web_server.route('/rerun', method='POST')
-def rerun():
-    print("[WEB] Outliers selected")
-    print(request.json)
-    selected = request.json['selected']
-    logic.svd.outliers = logic.svd.outliers + selected
-    # advance the loop
-    logic.step = Step.SAVE_OUTLIERS
-    logic.svd.step_queue = logic.svd.step_queue + [Step.INIT_RERUN]
-    return template('loading.html')
-
 @web_server.route('/shutdown', method='POST')
 def shutdown():
     print("[WEB] Outliers selected")
@@ -177,8 +164,6 @@ def run():
 
     parameter_list['privacy']['outlier_removal'] = request.forms.get('outlierremoval')
     parameter_list['privacy']['encryption'] = False
-    parameter_list['privacy']['show_result'] = request.forms.get("show_results")
-
     param_obj = {}
     param_obj['fc_pca'] = parameter_list
     with open(op.join(OUTPUT_DIR, 'config.yaml'), 'w') as handle:

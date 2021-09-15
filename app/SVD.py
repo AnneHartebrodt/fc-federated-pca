@@ -42,6 +42,18 @@ class SVD:
         return cls(H, G, S, tabdata, k)
 
     @classmethod
+    def init_local_subspace(cls,  tabdata, k=10) -> 'SVD':
+        """
+        Initialise an SVD object using the local subspace
+        method
+        :param k: number of eigenvectors, (default: 10)
+        :param tabdata: TabData object.
+        :return:
+        """
+        H, S, G, k = sh.svd_sub(tabdata.data, ndims=k)
+        return cls(H, G, S, tabdata, k)
+
+    @classmethod
     def from_file(cls, filename) -> 'SVD':
         #TODO: implement this
         return (None, None, None, None, None)

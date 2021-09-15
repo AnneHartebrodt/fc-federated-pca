@@ -9,6 +9,10 @@ import traceback
 from app.Steps import Step
 import numpy as np
 import copy
+from app.QR_params import QR
+from shutil import copyfile
+from shutil import copyfile
+from app.SVD import SVD
 
 class FCFederatedPCA:
     def __init__(self):
@@ -25,6 +29,7 @@ class FCFederatedPCA:
         self.iteration_counter = 0
         self.converged = False
         self.outliers = []
+        self.approximate_pca = True
 
 
     def next_state(self):
@@ -42,7 +47,6 @@ class FCFederatedPCA:
 
     def parse_configuration(self):
         print('[API] /setup parsing parameter file ')
-
         regex = re.compile('^config.*\.(yaml||yml)$')
         config_file = "ginger_tea.txt"
         # check input dir for config file
@@ -50,68 +54,86 @@ class FCFederatedPCA:
         for file in files:
             if regex.match(file):
                 config_file = op.join(INPUT_DIR, file)
+                config_out = op.join(OUTPUT_DIR, file)
                 break
-        #check output dir for config file
+        # check output dir for config file
         files = os.listdir(OUTPUT_DIR)
         for file in files:
             if regex.match(file):
                 config_file = op.join(OUTPUT_DIR, file)
                 break
         if op.exists(config_file):
-            print('[API] /setup config file found ... parsing')
+            # Copy file to output folder
+            print('[API] /setup config file found ... parsing file: ' + str(op.join(INPUT_DIR, config_file)))
+            copyfile(config_file, config_out)
+
             self.config_available = True
-            with open(op.join(INPUT_DIR, config_file), 'r') as file:
-                parameter_list = yaml.load(file, Loader=yaml.FullLoader)
+            with open(config_file, 'r') as file:
+                parameter_list = yaml.safe_load(file)
                 parameter_list = parameter_list['fc_pca']
                 # Files
-                self.input_file = op.join(INPUT_DIR, parameter_list['input']['data'])
+                try:
+                    self.input_file = op.join(INPUT_DIR, parameter_list['input']['data'])
+                except KeyError:
+                    print('YAML file does not follow specification: missing key '+ str('data'))
+                    raise KeyError
 
                 # prepend mount folder
-                self.eigenvalue_file =  op.join(OUTPUT_DIR, parameter_list['output']['eigenvalues'])
-                self.left_eigenvector_file =  op.join(OUTPUT_DIR, parameter_list['output']['left_eigenvectors'])
-                self.right_eigenvector_file =  op.join(OUTPUT_DIR, parameter_list['output']['right_eigenvectors'])
-                self.projection_file =  op.join(OUTPUT_DIR, parameter_list['output']['projections'])
-                self.scaled_data_file =  op.join(OUTPUT_DIR, parameter_list['output']['scaled_data'])
+                try:
+                    self.eigenvalue_file =  op.join(OUTPUT_DIR, parameter_list['output']['eigenvalues'])
+                except KeyError:
+                    print('YAML file does not follow specification: missing key: eigenvalues')
+                    print('Setting default: eigenvalues.tsv')
+                    self.eigenvalue_file = op.join(OUTPUT_DIR, 'eigenvalues.tsv')
 
-                print('files')
+                try:
+                    self.left_eigenvector_file =  op.join(OUTPUT_DIR, parameter_list['output']['left_eigenvectors'])
+                except KeyError:
+                    print('YAML file does not follow specification: missing key: left_eigenvectors')
+                    print('Setting default: left_eigenvectors.tsv')
+                    self.left_eigenvector_file = op.join(OUTPUT_DIR, 'left_eigenvectors.tsv')
 
-                self.k =  parameter_list['algorithm']['pcs']
-                self.algorithm =  parameter_list['algorithm']['algorithm']
-                self.federated_qr = parameter_list['algorithm']['qr']
-                self.max_iterations = parameter_list['algorithm']['max_iterations']
-                #print(parameter_list['algorithm']['epsilon'])
-                #self.epsilon = float(parameter_list['algorithm']['epsilon'])
-                print('set epsilon')
-                self.epsilon = 1e-9
-                print('done')
-                self.has_rownames = parameter_list['settings']['rownames']
-                self.has_colnames = parameter_list['settings']['colnames']
+                try:
+                    self.right_eigenvector_file =  op.join(OUTPUT_DIR, parameter_list['output']['right_eigenvectors'])
+                except KeyError:
+                    print('YAML file does not follow specification: missing key: right_eigenvectors')
+                    print('Setting default: right_eigenvectors.tsv')
+                    self.right_eigenvector_file = op.join(OUTPUT_DIR, 'right_eigenvectors.tsv')
 
-                print('colnames set')
-                self.sep = parameter_list['settings']['delimiter']
-                print('delimiter set')
-                print(parameter_list['settings'])
-                self.federated_dimensions = parameter_list['settings']['federated_dimension']
+                try:
+                    self.projection_file =  op.join(OUTPUT_DIR, parameter_list['output']['projections'])
+                except KeyError:
+                    print('YAML file does not follow specification: missing key: projections')
+                    print('Setting default: projections.tsv')
+                    self.projection_file = op.join(OUTPUT_DIR, 'projections.tsv')
 
-                print('algo settings')
-                print(parameter_list['scaling'])
-                self.center = parameter_list['scaling']['center']
-                self.scale_variance = parameter_list['scaling']['scale_variance']
-                self.transform = parameter_list['scaling']['transform']
-                self.scale_dim = parameter_list['scaling']['scale_dim']
+                try:
+                    self.k =  parameter_list['algorithm']['pcs']
+                    self.algorithm =  parameter_list['algorithm']['algorithm']
+                    self.federated_qr = QR.from_str(parameter_list['algorithm']['qr'])
+                    self.max_iterations = parameter_list['algorithm']['max_iterations']
+                    self.epsilon = float(parameter_list['algorithm']['epsilon'])
+                    self.approximate_pca = parameter_list['algorithm']['approximate_pca']
+                    self.init_method = parameter_list['algorithm']['init']
+                except KeyError:
+                    print('YAML file does not follow specification: algorithm settings: algorithm')
+                    raise KeyError
 
+                try:
+                    self.sep = parameter_list['settings']['delimiter']
+                    self.has_rownames = parameter_list['settings']['rownames']
+                    self.has_colnames = parameter_list['settings']['colnames']
+                    self.federated_dimensions = parameter_list['settings']['federated_dimension']
+                except KeyError:
+                    print('YAML file does not follow specification: settings')
+                    raise KeyError
 
-                print('scaling')
-                self.allow_rerun = parameter_list['privacy']['allow_rerun']
-                self.allow_transmission = parameter_list['privacy']['allow_transmission']
-
-                self.outlier_removal = parameter_list['privacy']['outlier_removal']
-                self.encryption = parameter_list['privacy']['encryption']
-                self.show_result = parameter_list['privacy']['show_result']
-
-                # Fall back to local outlier removal
-                if not self.allow_transmission and self.outlier_removal == 'global':
-                    self.outlier_removal = 'local'
+                try:
+                    self.allow_transmission = parameter_list['privacy']['allow_transmission']
+                    self.encryption = parameter_list['privacy']['encryption']
+                except KeyError:
+                    print('YAML file does not follow specification: privacy settings')
+                    raise KeyError
 
                 print('[API] /setup config file found ... parsing done')
 
@@ -129,47 +151,20 @@ class FCFederatedPCA:
             print('[API] reading data failed')
             print(traceback.print_exc())
 
-    def scale_data(self, incoming):
-        try:
-            means = incoming['means']
-            self.tabdata.scaled = self.tabdata.data - means
-            self.computation_done = True
-            self.send_data = False
-        except Exception as e:
-            print('[API] scaling data failed')
-            traceback.print_exc()
+
+    def init_random(self):
+        self.svd.pca = SVD.init_random(self.svd.tabdata, k=self.svd.k)
         return True
 
-    def scale_locally(self):
-        if self.center:
-            means = np.mean(self.tabdata.scaled, axis=1)
-            means = np.atleast_2d(means).T
-            self.tabdata.scaled = self.tabdata.scaled - means
-        if self.scale_variance:
-            vars = np.var(self.tabdata.scaled, axis=1)
-            vars[vars==0]=1
-            vars = np.atleast_2d(vars).T
-            self.tabdata.scaled = self.tabdata.scaled / vars
-        self.computation_done = True
-        self.send_data = False
+    def init_approximate(self):
+        self.svd.pca = SVD.init_local_subspace(self.svd.tabdata, k=self.svd.k)
+        return True
 
-    def scale_data_to_unit_variance(self, incoming):
-        try:
-            vars = incoming['vars']
-            self.tabdata.scaled = self.tabdata.data / vars
-            self.computation_done = True
-            self.send_data = False
-        except Exception as e:
-            print('[API] scaling data failed')
-            traceback.print_exc()
 
     def set_parameters(self, incoming):
         try:
             print('[API] setting parameters')
             self.k = incoming['pcs']
-            self.allow_rerun = incoming['allow_rerun']
-            self.allow_transmission = incoming['allow_transmission']
-            self.outlier_removal = incoming['outlier_removal']
             self.computation_done = True
         except Exception as e:
             print('[API] setting parameters failed')
@@ -244,6 +239,19 @@ class FCFederatedPCA:
             pd.DataFrame(ol).to_csv(op.join(OUTPUT_DIR, 'outliers.tsv'), header=False, sep='\t')
         self.computation_done = True
         self.send_data = False
+
+    def queue_shutdown(self):
+        self.step_queue = self.step_queue + [Step.SAVE_SVD, Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
+                                             Step.FINALIZE]
+
+    def init_federated_qr(self):
+        self.orthonormalisation_done = False
+        self.current_vector = 0
+        self.global_cornoms = []
+        self.local_vector_conorms = []
+        self.local_eigenvector_norm = -1
+        self.all_global_eigenvector_norms = []
+
 
 
 

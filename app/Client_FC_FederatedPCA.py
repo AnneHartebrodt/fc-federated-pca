@@ -6,6 +6,7 @@ import pandas as pd
 import traceback
 from app.Steps import Step
 import copy
+from app.QR_params import QR
 
 class ClientFCFederatedPCA(FCFederatedPCA):
     def __init__(self):
@@ -14,40 +15,26 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         FCFederatedPCA.__init__(self)
 
     def finalize_parameter_setup(self):
-        if self.scale_dim == 'rows':
-            if self.center and self.scale_variance:
-                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
-                                                     Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
-                                                     Step.SCALE_TO_UNIT_VARIANCE,  Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
-                                                     Step.COMPUTE_G_LOCAL]
-            elif self.center:
-                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.COMPUTE_LOCAL_SUMS, Step.SCALE_DATA,
-                                                     Step.SAVE_SCALED_DATA,
-                                                     Step.INIT_POWER_ITERATION,
-                                                     Step.COMPUTE_G_LOCAL]
+        self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,
+                           Step.READ_DATA]
+        if self.algorithm == 'approximate_pca':
+            self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
+                                                 Step.UPDATE_H]
 
-            elif self.scale_variance:
-                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
-                                                     Step.COMPUTE_LOCAL_SUM_OF_SQUARES,
-                                                     Step.SCALE_TO_UNIT_VARIANCE, Step.SAVE_SCALED_DATA, Step.INIT_POWER_ITERATION,
-                                                     Step.COMPUTE_G_LOCAL]
+        if self.algorithm == 'power_iteration':
+            if self.init_method == 'approximate_pca':
+                self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA]
             else:
-                self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA,
-                                                     Step.INIT_POWER_ITERATION,
-                                                     Step.COMPUTE_G_LOCAL]
-        elif self.scale_dim == 'columns':
-            self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS, Step.READ_DATA, Step.SCALE_LOCALLY,
-                                                 Step.SAVE_SCALED_DATA,
-                                                 Step.INIT_POWER_ITERATION,
-                                                 Step.COMPUTE_G_LOCAL]
-        else:
-            print('No scaling')
+                self.step_queue = self.step_queue + [Step.INIT_POWER_ITERATION]
+
+            if self.federated_qr == QR.NO_QR:
+                self.step_queue = self.step_queue + [Step.UPDATE_H]
+            else:
+                self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
+
         self.computation_done = True
+        print(self.step_queue)
         print('[API] [CLIENT] /setup config done!')
-        # if self.algorithm == 'power_iteration':
-        #     self.step_queue = ['init_algorithm', 'agree_on_row_names', 'init_power_iteration']
-        # else:
-        #     self.step_queue = ['init_algorithm', 'pca']
 
     def compute_local_sums(self):
         try:
@@ -90,45 +77,52 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         # this is the case for federated PCA and the first iteration
         # of centralised PCA
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        #print(self.pca.H)
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = True
         return True
+
+
+
+    def update_h(self, incoming):
+
+        # First, update the local G estimate
+        self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
+
+        # Then check for convergence.
+        self.converged = incoming['converged']
+        if self.converged:
+            self.queue_shutdown()
+        else:
+            self.step_queue = self.step_queue + [Step.UPDATE_H]
+
+        # If convergence not reached, update H and go on
+        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+        self.out = {'local_h': self.pca.H}
+        self.computation_done = True
+        self.send_data = True
+        return True
+
+    def queue_qr(self):
+            self.step_queue = self.step_queue + [Step.COMPUTE_LOCAL_NORM,
+                                                 Step.COMPUTE_LOCAL_CONORM,
+                                                 Step.ORTHOGONALISE_CURRENT] * (self.k - 1) +\
+                                                [Step.COMPUTE_LOCAL_NORM,
+                                                 Step.NORMALISE_G]
 
     def compute_g(self, incoming):
         self.pca.H = incoming['h_global']
         self.converged = incoming['converged']
         self.pca.G = np.dot(self.tabdata.scaled.T, self.pca.H)
 
-        print('G computed')
-        if self.federated_qr:
-            # send local norms
-            if self.converged:
-                self.step_queue = self.step_queue + [Step.COMPUTE_LOCAL_NORM, Step.COMPUTE_LOCAL_CONORM, Step.ORTHOGONALISE_CURRENT]*(self.k-1)+\
-                                  [Step.COMPUTE_LOCAL_NORM, Step.NORMALISE_G] + [Step.SAVE_SVD]
-
-                if self.show_result:
-                    self.step_queue = self.step_queue + [Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
-                                                         Step.SHOW_RESULT]
-                else:
-                    self.step_queue = self.step_queue + [Step.FINALIZE]
-
-            else:
-                self.step_queue = self.step_queue + [Step.COMPUTE_LOCAL_NORM, Step.COMPUTE_LOCAL_CONORM, Step.ORTHOGONALISE_CURRENT]*(self.k-1)+\
-                                  [Step.COMPUTE_LOCAL_NORM, Step.NORMALISE_G] + [Step.COMPUTE_H_LOCAL, Step.COMPUTE_G_LOCAL]
-                print(self.step_queue)
-            # next local step is to follow!
-            self.computation_done = True
+        if self.federated_qr == QR.FEDERATED_QR:
+            self.queue_qr()
+        if self.converged:
+            self.queue_shutdown()
         else:
-            if self.converged:
-                self.step_queue = self.step_queue + [Step.WAIT_FOR_G, Step.SAVE_SVD, Step.FINALIZE]
-            else:
-                self.step_queue = self.step_queue + [Step.COMPUTE_H_LOCAL, Step.COMPUTE_G_LOCAL]
-            self.send_data = True
-            self.computation_done = True
-            self.out = {'g_local': self.pca.G}
+            self.step_queue = self.step_queue + [Step.COMPUTE_H_LOCAL, Step.COMPUTE_G_LOCAL]
         print(self.step_queue)
+        self.computation_done = True
         return True
 
 
@@ -139,7 +133,16 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         print(self.tabdata.scaled.shape)
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         self.out = {'local_h': self.pca.H}
-        if self.federated_qr:
+        if self.federated_qr == QR.FEDERATED_QR:
+            self.init_federated_qr()
+        self.computation_done = True
+        self.send_data = True
+
+    def init_approximate_pca(self):
+        self.interation_counter = 0
+        self.converged = False
+        self.out = {'local_h': self.pca.H}
+        if self.federated_qr == QR.FEDERATED_QR:
             self.init_federated_qr()
         self.computation_done = True
         self.send_data = True
@@ -188,45 +191,3 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         self.computation_done = True
         self.send_data = True
         return True
-
-    def init_rerun(self):
-        # remove outliers from data
-        # copy svd object without samples
-        # I guess technically data should be rescaled.
-        # TODO rescale data.
-        self.tabdata.scaled = np.delete(self.tabdata.scaled, self.outliers, axis=1)
-        self.pca.G = np.delete(self.pca.G, self.outliers, axis=0)
-        self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
-        # reinit power iteration
-        self.init_power_iteration()
-        return True
-
-
-
-#def scale_datasets(data_list):
-    # sums = []
-    # sample_count = 0
-    #
-    # # mean
-    # sums = [np.sum(d, axis = 0) for d in data_list]
-    # sums = np.sum(sums, axis=0)
-    # sample_count = [d.shape[0] for d in data_list]
-    # total_count = sum(sample_count)
-    # means = [s/total_count for s in sums]
-    # for i in range(len(data_list)):
-    #     data_list[i] = data_list[i] - means
-    #
-    # #variance
-    #
-    # vars = [np.sum(np.square(d), axis=0) for d in data_list]
-    # vars = np.sum(vars, axis = 0)
-    # vars = vars/(total_count-1)
-    # # variance  = 0
-    # delete = np.where(vars==0)
-    # vars = np.delete(vars, delete)
-    # for i in range(len(data_list)):
-    #     data_list[i] = np.delete(data_list[i], delete, axis=1)
-    #
-    # for i in range(len(data_list)):
-    #     data_list[i] = data_list[i]/np.sqrt(vars)
-    # return data_list
