@@ -88,6 +88,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
         # First, update the local G estimate
         self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
+        self.pca.S = np.linalg.norm(self.pca.G, axis=1)
 
         # Then check for convergence.
         self.converged = incoming['converged']

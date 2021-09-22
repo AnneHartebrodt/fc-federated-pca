@@ -65,23 +65,34 @@ class AppLogic:
         self.svd = {}
         # batch config loops over the files
         if self.config.batch:
-            for d, i in zip(self.config.directories, range(self.config.directories)):
+            print('batch mode')
+            print(self.config.directories)
+            for d, i in zip(self.config.directories, range(len(self.config.directories))):
+
                 if self.coordinator:
                     self.svd[i] = AggregatorFCFederatedPCA()
                 else:
                     self.svd[i] = ClientFCFederatedPCA()
+                print('Object created')
+                self.svd[i].step = Step.LOAD_CONFIG
                 self.svd[i].copy_configuration(self.config, d)
+                print('Configuartion copied')
+                self.svd[i].finalize_parameter_setup()
+                print('Setup finalized')
         else:
             if self.coordinator:
                 self.svd[0] = AggregatorFCFederatedPCA()
             else:
                 self.svd[0] = ClientFCFederatedPCA()
+            self.svd[0].step = Step.LOAD_CONFIG
             self.svd[0].copy_configuration(self.config, '')
+            self.svd[0].finalize_parameter_setup()
 
         # set the pointer to the first action
         for i in range(len(self.svd)):
             self.svd[i].step = self.svd[i].next_state()
 
+        print('start flow')
         self.thread = threading.Thread(target=self.app_flow)
         self.thread.start()
 
@@ -89,21 +100,22 @@ class AppLogic:
         # This method is called when new data arrives
         print("Process incoming data....", flush=True)
         client = query.getunicode('client')
+        print('client: '+str(client))
         incoming = data.read()
         # Here we use a dictionary because some information is client
         # specific
         incoming = jsonpickle.decode(incoming)
-        
-        
-        for i in incoming.keys():    
+        for i in incoming.keys():
+            j = int(i)
             step = incoming[i]['step']
-            print(self.svd[i].data_incoming.keys())
-        
-            if step in self.svd[i].data_incoming.keys():
-                self.svd[i].data_incoming[step][client] = incoming
+            print(step)
+            if step in self.svd[j].data_incoming.keys():
+                self.svd[j].data_incoming[step][client] = incoming[i]
             else:
-                self.svd[i].data_incoming[step] = {}
-                self.svd[i].data_incoming[step][client] = incoming
+                self.svd[j].data_incoming[step] = {}
+                self.svd[j].data_incoming[step][client] = incoming[i]
+        print("Process incoming data.... DONE!", flush=True)
+
 
     def configure(self):
 
@@ -112,6 +124,7 @@ class AppLogic:
         if self.id is not None:  # Test is setup has happened already
             # parse parameters
             self.config = FCConfig()
+            print('Config created')
             self.config.parse_configuration()
             print("[CLIENT] finished parsing parameter file.", flush=True)
 
@@ -123,6 +136,7 @@ class AppLogic:
         print("Process outgoing data...", flush=True)
         # This method is called when data is requested
         outgoing_data = self.data_outgoing
+        print(outgoing_data)
         self.data_outgoing = None
         self.status_available = False
         return outgoing_data
@@ -131,7 +145,10 @@ class AppLogic:
         print('Flow started')
         # This method contains a state machine for the participant and coordinator instance
         while True:
+            print('Running')
             for i in range(len(self.svd)):
+                print(self.svd[i].step)
+                print(self.svd[i].data_incoming.keys())
                 if self.svd[i].step == Step.WAIT_FOR_PARAMS:
                     wait_for = Step.LOAD_CONFIG.value
                     print('CLIENT waiting for parameters '+ str(wait_for))
@@ -145,21 +162,21 @@ class AppLogic:
                             print("Error")
                         
                 elif self.svd[i].step == Step.READ_DATA:
+                    wait_for = Step.WAIT_FOR_PARAMS.value
                     self.progress = "read input..."
                     print("[CLIENT] Read input...", flush=True)
                     # Read the config file
                     self.svd[i].read_input_files()
+                    self.svd[i].data_incoming.pop(wait_for, None)
                     # Here you could read in your input files
                     print("[CLIENT] Read input finished.", flush=True)
     
                 elif self.svd[i].step == Step.INIT_POWER_ITERATION:
-                    try:
-
-                        self.svd[i].init_random()
-                        print('SVD init done')
-                        self.svd[i].init_power_iteration()
-                    except:
-                        print('Power iteration initialisation failed')
+                    self.iteration = self.iteration + 1
+                    print('SVD init')
+                    self.svd[i].init_random()
+                    print('SVD init done')
+                    self.svd[i].init_power_iteration()
     
                 elif self.svd[i].step == Step.APPROXIMATE_LOCAL_PCA:
                     self.svd[i].init_approximate()
@@ -182,6 +199,8 @@ class AppLogic:
                         wait_for = Step.AGGREGATE_SUBSPACES.value
                     elif Step.AGGREGATE_H.value in self.svd[i].data_incoming.keys():
                         wait_for = Step.AGGREGATE_H.value
+                    elif Step.INIT_POWER_ITERATION.value in self.svd[i].data_incoming.keys():
+                        wait_for = Step.INIT_POWER_ITERATION.value
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
@@ -211,7 +230,7 @@ class AppLogic:
                         wait_for = Step.UPDATE_H.value
                     else:
                         wait_for = Step.INIT_POWER_ITERATION.value
-                    print('COORDINATOR waiting for parameters ' + str(wait_for))
+                    print('COORDINATOR waiting for parameters ' + str(wait_for) + 'Recieved '+str(len(self.svd[i].data_incoming[wait_for])))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
                         print("[COORDINATOR] Aggregate results...", flush=True)
@@ -225,10 +244,12 @@ class AppLogic:
                             print('H aggregation failed')
     
                 elif self.svd[i].step == Step.UPDATE_H:
+                    print('Update H')
                     if self.iteration == 0:
                         wait_for = Step.AGGREGATE_SUBSPACES.value
                     else:
                         wait_for = Step.AGGREGATE_H.value
+                    print('CLIENT waiting for parameters ' + str(wait_for) + 'Recieved ')
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                         # Decode broadcasted data
@@ -332,24 +353,26 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:
-                    try:
-                        self.svd[i].save_pca()
-                    except:
-                        print('SVD saving failed')
+                    if Step.UPDATE_H.value in self.svd[i].data_incoming.keys():
+                        self.svd[i].data_incoming.pop(Step.UPDATE_H.value, None)
+
+                    self.svd[i].save_pca()
+
     
                 elif self.svd[i].step == Step.FINALIZE:
                     wait_for = Step.FINALIZE.value
                     if self.coordinator:
+                        print('CLIENT waiting for parameters ' + str(wait_for))
+                        print(self.svd[i].data_incoming)
                         if (wait_for in self.svd[i].data_incoming.keys() and \
                                 len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
-                            self.svd[i].status_finished = True
+                            self.status_finished = True
                             self.svd[i].step = Step.FINISHED
                     else:
-                        out = {'finished': True, 'step': Step.FINALIZE.value}
-                        self.data_outgoing = jsonpickle.encode(out)
-                        self.status_available = True
-                        self.status_finished = True
-                        self.svd[i].step = Step.FINISHED
+                        self.svd[i].out = {'finished': True, 'step': Step.FINALIZE.value}
+                        self.svd[i].send_data = True
+                        self.svd[i].computation_done = True
+                        self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
     
                 elif self.svd[i].step == Step.FINISHED:
                     print('App run completed')
@@ -357,6 +380,7 @@ class AppLogic:
                 else:
                     print("[CLIENT] NO SUCH STATE", flush=True)
 
+            outgoing_dict = {}
             for i in range(len(self.svd)):
                 # Dispatch data if required
                 if self.svd[i].computation_done:
@@ -371,13 +395,16 @@ class AppLogic:
                             #print(self.svd[i].out)
                             st = self.svd[i].step.value
                             self.svd[i].out['step'] = st
-    
-                            outgoing_dict = {}
-                            for i in range(len(self.svd)):
-                                outgoing_dict[i] = self.svd[i].out
+                            outgoing_dict[i] = self.svd[i].out
                                 
-                            self.data_outgoing = jsonpickle.encode(outgoing_dict)
-                            self.status_available = True
+                            #self.data_outgoing = jsonpickle.encode(outgoing_dict)
+                            #self.status_available = True
+
+                            # move data to inbox, create key if not available
+                            # Master just moves its local model to the inbox
+                            # for easy aggregation
+                            # dont encode because data is decoded upn arrival
+
                             if self.coordinator:
                                 if self.svd[i].step.value in self.svd[i].data_incoming.keys():
                                     self.svd[i].data_incoming[st][self.id] = self.svd[i].out
@@ -385,10 +412,8 @@ class AppLogic:
                                     self.svd[i].data_incoming[st] = {}
                                     self.svd[i].data_incoming[st][self.id] = self.svd[i].out
                         else:
-                            # Master just moves its local model to the inbox
-                            # for easy aggregation
-                            # dont encode because data is decoded upn arrival
-                            
+                            print('Move data to inbox')
+                            # Don't send data, just move to inbox.
                             if self.svd[i].out is not None:
                                 st = self.svd[i].step.value
                                 self.svd[i].out['step'] = st
@@ -406,6 +431,12 @@ class AppLogic:
                         self.svd[i].step = self.svd[i].next_state()
                     except:
                         print('Dispatch failed')
+            if outgoing_dict != {}:
+                self.data_outgoing = jsonpickle.encode(outgoing_dict)
+                self.status_available = True
+                outgoing_dict = {}
+
+
             time.sleep(1)
 
 

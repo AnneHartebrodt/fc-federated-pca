@@ -14,8 +14,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         FCFederatedPCA.__init__(self)
 
     def finalize_parameter_setup(self):
-        self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,
-                                             Step.READ_DATA]
+        self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,Step.READ_DATA]
         if self.algorithm == 'approximate_pca':
             self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
                                                  Step.AGGREGATE_SUBSPACES,
@@ -25,8 +24,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
                 self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
                                                      Step.AGGREGATE_SUBSPACES]
             else:
-                self.step_queue = self.step_queue + [Step.INIT_POWER_ITERATION,
-                                                     Step.AGGREGATE_H]
+                self.step_queue = self.step_queue + [Step.INIT_POWER_ITERATION, Step.AGGREGATE_H]
 
             if self.federated_qr == QR.NO_QR:
                 self.step_queue = self.step_queue + [Step.UPDATE_H]
@@ -38,7 +36,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         # No user interaction required, set available to true
         # master still sends configuration to all clients.
         self.out = {'pcs': self.k}
-
+        print(self.step_queue)
         self.send_data = True
         self.computation_done = True
         print('[API] [COORDINATOR] /setup config done!')
@@ -103,16 +101,20 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
         # First, update the local G estimate
         self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
+        self.pca.S = np.linalg.norm(self.pca.G, axis=1)
 
         # Then check for convergence.
         self.converged = incoming['converged']
+        self.pca.previous_h = self.pca.H
         if self.converged:
+            self.pca.H = incoming['h_global']
             self.queue_shutdown()
         else:
             self.step_queue = self.step_queue + [Step.AGGREGATE_H, Step.UPDATE_H]
-
+            self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         # If convergence not reached, update H and go on
-        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+
+
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = False

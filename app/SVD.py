@@ -70,12 +70,10 @@ class SVD:
         return True
 
     def to_csv(self, left_eigenvector_file, right_eigenvector_file, eigenvalue_file, sep='\t'):
-        try:
-            pd.DataFrame(self.H).to_csv(left_eigenvector_file, sep=sep, header=False, index=False)
-            pd.DataFrame(self.G).to_csv(right_eigenvector_file, sep=sep, header=False, index=False)
-            pd.DataFrame(self.S).to_csv(eigenvalue_file, sep=sep, header=False, index=False)
-        except:
-            print('Saving data failed')
+
+        pd.DataFrame(self.H).to_csv(left_eigenvector_file, sep=sep, header=False, index=False)
+        pd.DataFrame(self.G).to_csv(right_eigenvector_file, sep=sep, header=False, index=False)
+        pd.DataFrame(self.S).to_csv(eigenvalue_file, sep=sep, header=False, index=False)
 
     def save_projections(self, projection_file, sep='\t'):
         save = pd.DataFrame(self.projections)

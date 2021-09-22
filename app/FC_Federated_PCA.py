@@ -84,11 +84,12 @@ class FCFederatedPCA:
 
 
     def init_random(self):
-        self.svd.pca = SVD.init_random(self.svd.tabdata, k=self.svd.k)
+        print('init random')
+        self.pca = SVD.init_random(self.tabdata, k=self.k)
         return True
 
     def init_approximate(self):
-        self.svd.pca = SVD.init_local_subspace(self.svd.tabdata, k=self.svd.k)
+        self.pca = SVD.init_local_subspace(self.tabdata, k=self.k)
         return True
 
 
@@ -112,6 +113,9 @@ class FCFederatedPCA:
         return True
 
     def save_pca(self):
+        print(self.eigenvalue_file)
+        print(self.left_eigenvector_file)
+        print(self.right_eigenvector_file)
         self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False

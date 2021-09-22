@@ -68,11 +68,14 @@ class FCConfig:
                 parameter_list = parameter_list['fc_pca']
 
                 self.batch = parameter_list['input']['batch']
+                print(self.batch)
                 if self.batch:
+                    print('CONFIG: BATCH Mode')
                     folders = os.listdir(INPUT_DIR)
                     for f in folders:
-                        if op.isdir(f):
+                        if op.isdir(op.join(INPUT_DIR, f)):
                             self.directories.append(f)
+                            os.makedirs(op.join(OUTPUT_DIR, f), exist_ok=True)
                 # Files
                 try:
                     self.input_file = parameter_list['input']['data']
