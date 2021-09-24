@@ -1,8 +1,10 @@
 import numpy as np
 import scipy as sc
 import pandas as pd
+import scipy.sparse.linalg as la
 import os
 import argparse as ap
+import os.path as op
 
 def generate_data(number_features, number_samples, variable_means=None, variable_stds=None, seed=11):
     """
@@ -15,6 +17,7 @@ def generate_data(number_features, number_samples, variable_means=None, variable
     :param seed: random seed
     :return: numpy array of generated data containing samples (rows) x features (colums)
     """
+    np.random.seed(seed)
     if variable_means is not None:
         assert  len(variable_means) == len(variable_stds), "Number of means and stds should be equal"
         assert len(variable_means) == number_features, "Number of variables should be eqaul to length of mean/std vectors"
@@ -30,13 +33,18 @@ def generate_data(number_features, number_samples, variable_means=None, variable
 
 if __name__ == '__main__':
     parser = ap.ArgumentParser(description='Generate sample data for federated PCA')
+    parser.add_argument('-d', metavar='DIRECTORY', type=str, help='output directory', default='.')
     parser.add_argument('-f', metavar='FILE', type=str, help='filename of data file')
     parser.add_argument('-n', metavar='SAMPLES', type=int, help='Number of samples')
     parser.add_argument('-m', metavar='VARIABLES', type=int, help='Number of variables')
     parser.add_argument('--means', metavar='VARIABLE_MEANS', type=str, help='Variable means, if omitted 0', default=None)
     parser.add_argument('--stds', metavar='VARIABLE_STDS', type=str, help='Variable standard deviations, if omitted 1', default=None)
+    parser.add_argument('-s', metavar='SEED', type=int, help='random seed', default=11)
+    parser.add_argument('-b', metavar='BATCH', type=int, help='number of batches', default=1)
     args = parser.parse_args()
-    basedir = '.'
+    basedir = args.d
+
+    baseline_data_folder = op.join(basedir, 'data')
 
     total_samples = 500
     variables = 10
@@ -52,6 +60,21 @@ if __name__ == '__main__':
         variable_means = None
         variable_stds = None
 
+    if args.b <= 1:
+        os.makedirs(baseline_data_folder, exist_ok=True)
+        data = generate_data(number_features=args.m, number_samples=args.n, variable_means=variable_means, variable_stds=variable_stds, seed=args.s)
+        pd.DataFrame(data).to_csv(op.join(baseline_data_folder, args.f), sep='\t', header=False, index=False)
 
-    data = generate_data(number_features=args.m, number_samples=args.n, variable_means=variable_means, variable_stds=variable_stds)
-    pd.DataFrame(data).to_csv(args.f, sep='\t', header=False, index=False)
+    else:
+        # increment seed
+        for s in range(args.s, args.s+args.b):
+            os.makedirs(op.join(baseline_data_folder, str(s)), exist_ok=True)
+            data = generate_data(number_features=args.m, number_samples=args.n, variable_means=variable_means,
+                                 variable_stds=variable_stds, seed=s)
+            pd.DataFrame(data).to_csv(op.join(baseline_data_folder, str(s), args.f), sep='\t', header=False, index=False)
+
+    # nfeatures = 5
+    # nsamples = 10
+    # seed = 11
+    #
+    # dd = generate_data(nfeatures, nsamples, seed=seed)
