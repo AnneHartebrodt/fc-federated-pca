@@ -42,25 +42,10 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         print('[API] [COORDINATOR] /setup config done!')
 
 
-
-    def compute_h(self, incoming, client_id):
-        # this is the case for federated PCA and the first iteration
-        # of centralised PCA
-        # Compute dot product of data and G_i
-        self.pca.G = incoming['g_matrices'][client_id]
-        self.pca.S = incoming['eigenvalues']
-        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
-        self.computation_done = True
-        self.send_data = False
-        return True
-
     def compute_h_local_g(self):
         # this is the case for federated PCA and the first iteration
         # of centralised PCA
-        print('Compute H')
-        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
+        super(AggregatorFCFederatedPCA, self).compute_h_local_g()
         self.computation_done = True
         self.send_data = False
         return True
@@ -78,9 +63,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
     def compute_g(self, incoming):
         self.pca.H = incoming['h_global']
         self.converged = incoming['converged']
-
         self.pca.G = np.dot(self.tabdata.scaled.T, self.pca.H)
-
         if self.federated_qr == QR.FEDERATED_QR:
             self.queue_qr()
             # send local norms
@@ -112,13 +95,10 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
             self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         # If convergence not reached, update H and go on
 
-
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = False
         return True
-
-
 
     def aggregate_h(self, incoming):
         '''
@@ -162,7 +142,6 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.computation_done = True
         self.send_data = False
 
-
     def aggregate_eigenvector_norms(self, incoming):
         eigenvector_norm = 0
         for v in incoming:
@@ -187,31 +166,16 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.send_data = True
 
     def compute_local_eigenvector_norm(self):
-        print('starting eigenvector norms')
-        # not the euclidean norm, because the square root needs to be calculated
-        # at the aggregator
-        self.local_eigenvector_norm = np.dot(self.pca.G[:, self.current_vector],
-                                  self.pca.G[:, self.current_vector])
-        self.current_vector = self.current_vector + 1
-        self.out = {'local_eigenvector_norm': self.local_eigenvector_norm}
+        super(AggregatorFCFederatedPCA, self).compute_local_eigenvector_norm()        
         self.computation_done = True
         self.send_data = False
         return True
 
     def calculate_local_vector_conorms(self, incoming):
-        vector_conorms = []
-        # append the lastly calculated norm to the list of global norms
-        self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
-        for cvi in range(self.current_vector):
-            vector_conorms.append(np.dot(self.pca.G[:, cvi], self.pca.G[:, self.current_vector]) / self.all_global_eigenvector_norms[cvi])
-        self.local_vector_conorms = vector_conorms
-        if self.current_vector == self.k:
-            self.orthonormalisation_done = True
-        self.out = {'local_conorms': self.local_vector_conorms}
+        super(AggregatorFCFederatedPCA, self).calculate_local_vector_conorms()
         self.computation_done = True
         self.send_data = False
         return True
-
 
     def aggregate_local_subspaces(self, incoming):
         h_matrices = []

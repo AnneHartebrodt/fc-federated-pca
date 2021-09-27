@@ -203,6 +203,30 @@ class FCFederatedPCA:
         if self.federated_qr == QR.FEDERATED_QR:
             self.init_federated_qr()
 
+    def compute_h_local_g(self):
+        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+        self.out = {'local_h': self.pca.H}
+        return True
 
+    def calculate_local_vector_conorms(self, incoming):
+        vector_conorms = []
+        # append the lastly calculated norm to the list of global norms
+        self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
+        for cvi in range(self.current_vector):
+            vector_conorms.append(np.dot(self.pca.G[:, cvi], self.pca.G[:, self.current_vector]) / self.all_global_eigenvector_norms[cvi])
+        self.local_vector_conorms = vector_conorms
+        if self.current_vector == self.k:
+            self.orthonormalisation_done = True
+        self.out = {'local_conorms': self.local_vector_conorms}
+        return True
 
+    def compute_local_eigenvector_norm(self):
+        print('starting eigenvector norms')
+        # not the euclidean norm, because the square root needs to be calculated
+        # at the aggregator
+        self.local_eigenvector_norm = np.dot(self.pca.G[:, self.current_vector],
+                                  self.pca.G[:, self.current_vector])
+        self.current_vector = self.current_vector + 1
+        self.out = {'local_eigenvector_norm': self.local_eigenvector_norm}
 
+        return True
