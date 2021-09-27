@@ -1,33 +1,30 @@
 from enum import Enum
 
 class Step(Enum):
-    LOAD_CONFIG = 'load_config'
-    WAIT_FOR_PARAMS = 'wait_for_params'
-    READ_DATA = 'read_data'
-    COMPUTE_H_LOCAL = 'Compute H local'
-    COMPUTE_G_LOCAL = 'Compute G local'
-    AGGREGATE_H = 'Aggregate_H'
-    INIT_POWER_ITERATION = 'Init power iteration'
-    UPDATE_H = 'Update H'
-    SAVE_SVD = 'Save_SVD'
-    SAVE_SCALED_DATA = 'Save scaled data'
+    LOAD_CONFIG = 'Loading configuration parameters'
+    WAIT_FOR_PARAMS = 'Waiting for parameters'
+    READ_DATA = 'Reading data'
+    COMPUTE_H_LOCAL = 'Updating local eigenvectors'
+    COMPUTE_G_LOCAL = 'Updating local left eigenvectors'
+    AGGREGATE_H = 'Aggregating eigenvectors'
+    INIT_POWER_ITERATION = 'Inititialising Power iteration'
+    UPDATE_H = 'Updating local eigenvectors (no QR)'
+    SAVE_SVD = 'Saving SVD'
+    SAVE_SCALED_DATA = 'Saving scaled data'
 
-    FINALIZE = 'finalize'
-    FINISHED = 'finished'
-    COMPUTE_PROJECTIONS = 'compute_projections'
-    SAVE_PROJECTIONS = 'save_projections'
-    SAVE_OUTLIERS = 'Save outliers'
-    INIT_RERUN = 'INIT_RERUN'
-
-    APPROXIMATE_LOCAL_PCA = 'APPROXIMATE_LOCAL_PCA'
-    AGGREGATE_SUBSPACES = 'AGGREGATE_SUBSPACES'
+    FINALIZE = 'Finalising'
+    FINISHED = 'Finished'
+    COMPUTE_PROJECTIONS = 'Computing projections'
+    SAVE_PROJECTIONS = 'Saving projections'
 
 
-    COMPUTE_LOCAL_NORM = 'Compute local norm'
-    COMPUTE_LOCAL_CONORM = 'Compute local conorm'
-    AGGREGATE_NORM = 'Aggregate norm'
-    AGGREGATE_CONORM = 'Aggregate Conorm'
-    ORTHOGONALISE_CURRENT = "orthogonalise current"
-    NORMALISE_G = 'Normalise orthongonal matrix'
+    APPROXIMATE_LOCAL_PCA = 'Approximating local subspaces'
+    AGGREGATE_SUBSPACES = 'Aggregating approx. subspaces'
 
-    COMPUTING = 'COMPUTING'
+
+    COMPUTE_LOCAL_NORM = 'Computing local norm'
+    COMPUTE_LOCAL_CONORM = 'Computing local co-norm'
+    AGGREGATE_NORM = 'Aggregating norms'
+    AGGREGATE_CONORM = 'Aggregating co-norms'
+    ORTHOGONALISE_CURRENT = "orthogonalising eigenvectors (federated QR)"
+    NORMALISE_G = 'Normalising orthongonalised matrix'

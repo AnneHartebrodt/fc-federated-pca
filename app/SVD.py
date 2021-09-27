@@ -23,6 +23,8 @@ class SVD:
         :return:
         """
 
+        k = min(tabdata.col_count, k)
+        print(k)
         H = sh.generate_random_gaussian(tabdata.row_count, k)
         G = sh.generate_random_gaussian(tabdata.col_count, k)
         S = sh.generate_random_gaussian(k, 1).flatten()
@@ -50,6 +52,8 @@ class SVD:
         :param tabdata: TabData object.
         :return:
         """
+        k = min(tabdata.col_count, k)
+        print(k)
         H, S, G, k = sh.svd_sub(tabdata.data, ndims=k)
         return cls(H, G, S, tabdata, k)
 

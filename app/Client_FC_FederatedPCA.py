@@ -128,23 +128,12 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
 
     def init_power_iteration(self):
-        self.iteration_counter = 0
-        self.converged = False
-        print(self.pca.G.shape)
-        print(self.tabdata.scaled.shape)
-        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
-        if self.federated_qr == QR.FEDERATED_QR:
-            self.init_federated_qr()
+        super(ClientFCFederatedPCA, self).init_power_iteration()
         self.computation_done = True
         self.send_data = True
 
     def init_approximate_pca(self):
-        self.interation_counter = 0
-        self.converged = False
-        self.out = {'local_h': self.pca.H}
-        if self.federated_qr == QR.FEDERATED_QR:
-            self.init_federated_qr()
+        super(ClientFCFederatedPCA, self).init_approximate_pca()
         self.computation_done = True
         self.send_data = True
 

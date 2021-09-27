@@ -28,6 +28,8 @@ def ctrl_status():
     return json.dumps({
         "available": logic.status_available,
         "finished": logic.status_finished,
+        "message": logic.message,
+        "state": logic.workflow_state,
     })
 
 

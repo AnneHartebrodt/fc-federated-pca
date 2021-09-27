@@ -42,7 +42,8 @@ class AppLogic:
         # === Internals ===
         self.thread = None
         self.iteration = 0
-        self.progress = "not started yet"
+        self.message = 'Starting'
+        self.workflow_state = 'running'
         self.local_result = None
         self.global_result = None
 
@@ -80,12 +81,15 @@ class AppLogic:
                 self.svd[i].finalize_parameter_setup()
                 print('Setup finalized')
         else:
+            print('single mode')
             if self.coordinator:
                 self.svd[0] = AggregatorFCFederatedPCA()
             else:
                 self.svd[0] = ClientFCFederatedPCA()
+            print('Object created')
             self.svd[0].step = Step.LOAD_CONFIG
             self.svd[0].copy_configuration(self.config, '')
+            print('Configuartion copied')
             self.svd[0].finalize_parameter_setup()
 
         # set the pointer to the first action
@@ -108,7 +112,6 @@ class AppLogic:
         for i in incoming.keys():
             j = int(i)
             step = incoming[i]['step']
-            print(step)
             if step in self.svd[j].data_incoming.keys():
                 self.svd[j].data_incoming[step][client] = incoming[i]
             else:
@@ -118,8 +121,6 @@ class AppLogic:
 
 
     def configure(self):
-
-        self.progress = "initializing..."
         print("[CLIENT] Parsing parameter file...", flush=True)
         if self.id is not None:  # Test is setup has happened already
             # parse parameters
@@ -136,46 +137,40 @@ class AppLogic:
         print("Process outgoing data...", flush=True)
         # This method is called when data is requested
         outgoing_data = self.data_outgoing
-        print(outgoing_data)
         self.data_outgoing = None
         self.status_available = False
         return outgoing_data
 
     def app_flow(self):
-        print('Flow started')
         # This method contains a state machine for the participant and coordinator instance
         while True:
-            print('Running')
             for i in range(len(self.svd)):
-                print(self.svd[i].step)
-                print(self.svd[i].data_incoming.keys())
+                self.message = self.svd[i].step.value
+                print("Current step " + str(self.svd[i].step))
                 if self.svd[i].step == Step.WAIT_FOR_PARAMS:
-                    wait_for = Step.LOAD_CONFIG.value
-                    print('CLIENT waiting for parameters '+ str(wait_for))
+                    wait_for = Step.LOAD_CONFIG
+                    print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         try:
                             key = list(self.svd[i].data_incoming[wait_for].keys())[0]
                             incoming = self.svd[i].data_incoming[wait_for][key]
                             self.svd[i].data_incoming.pop(wait_for, None)
                             self.svd[i].set_parameters(incoming)
-                        except:
-                            print("Error")
+                        except Exception as e:
+
+                            print("Error loading configuration")
+                            print(e)
                         
                 elif self.svd[i].step == Step.READ_DATA:
-                    wait_for = Step.WAIT_FOR_PARAMS.value
-                    self.progress = "read input..."
+                    wait_for = Step.WAIT_FOR_PARAMS
                     print("[CLIENT] Read input...", flush=True)
-                    # Read the config file
                     self.svd[i].read_input_files()
                     self.svd[i].data_incoming.pop(wait_for, None)
-                    # Here you could read in your input files
                     print("[CLIENT] Read input finished.", flush=True)
     
                 elif self.svd[i].step == Step.INIT_POWER_ITERATION:
                     self.iteration = self.iteration + 1
-                    print('SVD init')
                     self.svd[i].init_random()
-                    print('SVD init done')
                     self.svd[i].init_power_iteration()
     
                 elif self.svd[i].step == Step.APPROXIMATE_LOCAL_PCA:
@@ -183,7 +178,7 @@ class AppLogic:
                     self.svd[i].init_approximate_pca()
     
                 elif self.svd[i].step == Step.AGGREGATE_SUBSPACES:
-                    wait_for = Step.APPROXIMATE_LOCAL_PCA.value
+                    wait_for = Step.APPROXIMATE_LOCAL_PCA
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
@@ -195,12 +190,12 @@ class AppLogic:
                         self.svd[i].aggregate_local_subspaces(incoming)
     
                 elif self.svd[i].step == Step.COMPUTE_G_LOCAL:
-                    if Step.AGGREGATE_SUBSPACES.value in self.svd[i].data_incoming.keys():
-                        wait_for = Step.AGGREGATE_SUBSPACES.value
-                    elif Step.AGGREGATE_H.value in self.svd[i].data_incoming.keys():
-                        wait_for = Step.AGGREGATE_H.value
-                    elif Step.INIT_POWER_ITERATION.value in self.svd[i].data_incoming.keys():
-                        wait_for = Step.INIT_POWER_ITERATION.value
+                    if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                        wait_for = Step.AGGREGATE_SUBSPACES
+                    elif Step.AGGREGATE_H in self.svd[i].data_incoming.keys():
+                        wait_for = Step.AGGREGATE_H
+                    elif Step.INIT_POWER_ITERATION in self.svd[i].data_incoming.keys():
+                        wait_for = Step.INIT_POWER_ITERATION
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
@@ -220,36 +215,36 @@ class AppLogic:
                         try:
                             print('Computing H')
                             self.svd[i].compute_h_local_g()
-                        except:
+                        except Exception as e:
                             print('H computation failed')
     
                 elif self.svd[i].step == Step.AGGREGATE_H:
-                    if Step.COMPUTE_H_LOCAL.value in self.svd[i].data_incoming.keys():
-                        wait_for = Step.COMPUTE_H_LOCAL.value
-                    elif Step.UPDATE_H.value in self.svd[i].data_incoming.keys():
-                        wait_for = Step.UPDATE_H.value
+                    if Step.COMPUTE_H_LOCAL in self.svd[i].data_incoming.keys():
+                        wait_for = Step.COMPUTE_H_LOCAL
+                    elif Step.UPDATE_H in self.svd[i].data_incoming.keys():
+                        wait_for = Step.UPDATE_H
                     else:
-                        wait_for = Step.INIT_POWER_ITERATION.value
+                        wait_for = Step.INIT_POWER_ITERATION
                     print('COORDINATOR waiting for parameters ' + str(wait_for) + 'Recieved '+str(len(self.svd[i].data_incoming[wait_for])))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
                         print("[COORDINATOR] Aggregate results...", flush=True)
-                        # Decode received data of each client
-                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
-                        # Empty the incoming data (important for multiple iterations)
-                        self.svd[i].data_incoming.pop(wait_for, None)
                         try:
+                            # Decode received data of each client
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].data_incoming.pop(wait_for, None)
                             self.svd[i].aggregate_h(incoming)
-                        except:
+                        except Exception as e:
                             print('H aggregation failed')
+                            print(e)
     
                 elif self.svd[i].step == Step.UPDATE_H:
-                    print('Update H')
                     if self.iteration == 0:
-                        wait_for = Step.AGGREGATE_SUBSPACES.value
+                        wait_for = Step.AGGREGATE_SUBSPACES
                     else:
-                        wait_for = Step.AGGREGATE_H.value
-                    print('CLIENT waiting for parameters ' + str(wait_for) + 'Recieved ')
+                        wait_for = Step.AGGREGATE_H
+                    print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                         # Decode broadcasted data
@@ -267,7 +262,7 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.COMPUTE_LOCAL_CONORM:
-                    wait_for = Step.AGGREGATE_NORM.value
+                    wait_for = Step.AGGREGATE_NORM
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                         # Decode broadcasted data
@@ -281,7 +276,7 @@ class AppLogic:
                             print('Local co-norm computation failed')
     
                 elif self.svd[i].step == Step.ORTHOGONALISE_CURRENT:
-                    wait_for = Step.AGGREGATE_CONORM.value
+                    wait_for = Step.AGGREGATE_CONORM
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
                         # Decode broadcasted data
@@ -296,7 +291,7 @@ class AppLogic:
                             print('Orthogonalisation failed')
     
                 elif self.svd[i].step == Step.AGGREGATE_NORM:
-                    wait_for = Step.COMPUTE_LOCAL_NORM.value
+                    wait_for = Step.COMPUTE_LOCAL_NORM
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
                         print("[COORDINATOR] Aggregate results...", flush=True)
@@ -311,13 +306,10 @@ class AppLogic:
                             print("Eigenvector aggregatio failed")
     
                 elif self.svd[i].step == Step.AGGREGATE_CONORM:
-                    wait_for = Step.COMPUTE_LOCAL_CONORM.value
+                    wait_for = Step.COMPUTE_LOCAL_CONORM
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
                         print("[COORDINATOR] Aggregate results...", flush=True)
-                        # Decode received data of each client
-                        #incoming = [jsonpickle.decode(client_data) for client_data in self.svd[i].data_incoming]
-                        # the parameters are client specific
                         incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
                         # Empty the incoming data (important for multiple iterations)
                         self.svd[i].data_incoming.pop(wait_for, None)
@@ -327,7 +319,7 @@ class AppLogic:
                             print('Co-norm aggregation failed')
     
                 elif self.svd[i].step == Step.NORMALISE_G:
-                    wait_for = Step.AGGREGATE_NORM.value
+                    wait_for = Step.AGGREGATE_NORM
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                         print("[CLIENT] Process aggregated result from coordinator...", flush=True)
@@ -353,14 +345,13 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:
-                    if Step.UPDATE_H.value in self.svd[i].data_incoming.keys():
-                        self.svd[i].data_incoming.pop(Step.UPDATE_H.value, None)
-
+                    if Step.UPDATE_H in self.svd[i].data_incoming.keys():
+                        self.svd[i].data_incoming.pop(Step.UPDATE_H, None)
                     self.svd[i].save_pca()
 
     
                 elif self.svd[i].step == Step.FINALIZE:
-                    wait_for = Step.FINALIZE.value
+                    wait_for = Step.FINALIZE
                     if self.coordinator:
                         print('CLIENT waiting for parameters ' + str(wait_for))
                         print(self.svd[i].data_incoming)
@@ -369,7 +360,7 @@ class AppLogic:
                             self.status_finished = True
                             self.svd[i].step = Step.FINISHED
                     else:
-                        self.svd[i].out = {'finished': True, 'step': Step.FINALIZE.value}
+                        self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
                         self.svd[i].send_data = True
                         self.svd[i].computation_done = True
                         self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
@@ -393,7 +384,7 @@ class AppLogic:
                         if self.svd[i].send_data:
                             # Send data if required
                             #print(self.svd[i].out)
-                            st = self.svd[i].step.value
+                            st = self.svd[i].step
                             self.svd[i].out['step'] = st
                             outgoing_dict[i] = self.svd[i].out
                                 
@@ -406,7 +397,7 @@ class AppLogic:
                             # dont encode because data is decoded upn arrival
 
                             if self.coordinator:
-                                if self.svd[i].step.value in self.svd[i].data_incoming.keys():
+                                if self.svd[i].step in self.svd[i].data_incoming.keys():
                                     self.svd[i].data_incoming[st][self.id] = self.svd[i].out
                                 else:
                                     self.svd[i].data_incoming[st] = {}
@@ -415,9 +406,9 @@ class AppLogic:
                             print('Move data to inbox')
                             # Don't send data, just move to inbox.
                             if self.svd[i].out is not None:
-                                st = self.svd[i].step.value
+                                st = self.svd[i].step
                                 self.svd[i].out['step'] = st
-                                if self.svd[i].step.value in self.svd[i].data_incoming.keys():
+                                if self.svd[i].step in self.svd[i].data_incoming.keys():
                                     self.svd[i].data_incoming[st][self.id] = self.svd[i].out
                                 else:
                                     self.svd[i].data_incoming[st] = {}

@@ -29,7 +29,7 @@ class FCConfig:
         self.federated_qr = False
         self.max_iterations = 500
         self.epsilon = 10e-9
-        self.approximate_pca =None
+
         self.init_method = 'approximate_pca'
 
         self.sep = '\t'
@@ -113,12 +113,11 @@ class FCConfig:
                     self.projection_file =  'projections.tsv'
 
                 try:
-                    self.k =  parameter_list['algorithm']['pcs']
+                    self.k = parameter_list['algorithm']['pcs']
                     self.algorithm =  parameter_list['algorithm']['algorithm']
                     self.federated_qr = QR.from_str(parameter_list['algorithm']['qr'])
                     self.max_iterations = parameter_list['algorithm']['max_iterations']
                     self.epsilon = float(parameter_list['algorithm']['epsilon'])
-                    self.approximate_pca = parameter_list['algorithm']['approximate_pca']
                     self.init_method = parameter_list['algorithm']['init']
                 except KeyError:
                     print('YAML file does not follow specification: algorithm settings: algorithm')
@@ -128,7 +127,6 @@ class FCConfig:
                     self.sep = parameter_list['settings']['delimiter']
                     self.has_rownames = parameter_list['settings']['rownames']
                     self.has_colnames = parameter_list['settings']['colnames']
-                    self.federated_dimensions = parameter_list['settings']['federated_dimension']
                 except KeyError:
                     print('YAML file does not follow specification: settings')
                     raise KeyError

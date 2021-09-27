@@ -47,11 +47,9 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         # this is the case for federated PCA and the first iteration
         # of centralised PCA
         # Compute dot product of data and G_i
-        print('Computing H locally')
         self.pca.G = incoming['g_matrices'][client_id]
         self.pca.S = incoming['eigenvalues']
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        print('Done!!!')
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = False
@@ -141,6 +139,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         # The previous H matrix is stored in the global variable
         print('orthonormalised')
         print(self.epsilon)
+        print(self.pca.H.shape)
+        print(self.pca.previous_h.shape)
         converged, deltas = eigenvector_convergence_checker(global_HI_matrix, self.pca.previous_h, tolerance=self.epsilon)
         print(converged)
         if self.iteration_counter == self.max_iterations or converged:
@@ -153,34 +153,14 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         return True
 
     def init_power_iteration(self):
-        self.iteration_counter = 0
-        self.converged = False
-        print(self.pca.G.shape)
-        print(self.tabdata.scaled.shape)
-        self.pca.previous_h = self.pca.H
-        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
-        if self.federated_qr == QR.FEDERATED_QR:
-            self.init_federated_qr()
+        super(AggregatorFCFederatedPCA, self).init_power_iteration()
         self.computation_done = True
         self.send_data = False
 
     def init_approximate_pca(self):
-        self.interation_counter = 0
-        self.converged = False
-        self.out = {'local_h': self.pca.H}
+        super(AggregatorFCFederatedPCA, self).init_approximate_pca()
         self.computation_done = True
         self.send_data = False
-        if self.federated_qr == QR.FEDERATED_QR:
-            self.init_federated_qr()
-        
-    # def init_federated_qr(self):
-    #     self.current_vector= 0
-    #     self.orthonormalisation_done = False
-    #     self.global_cornoms = []
-    #     self.local_vector_conorms = []
-    #     self.local_eigenvector_norm = -1
-    #     self.all_global_eigenvector_norms = []
 
 
     def aggregate_eigenvector_norms(self, incoming):
@@ -222,13 +202,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         vector_conorms = []
         # append the lastly calculated norm to the list of global norms
         self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
-        print('Computing local co norms')
-        #print(vector_conorms)
-        print(self.current_vector)
-        #print(self.pca.G)
         for cvi in range(self.current_vector):
             vector_conorms.append(np.dot(self.pca.G[:, cvi], self.pca.G[:, self.current_vector]) / self.all_global_eigenvector_norms[cvi])
-        print('done')
         self.local_vector_conorms = vector_conorms
         if self.current_vector == self.k:
             self.orthonormalisation_done = True

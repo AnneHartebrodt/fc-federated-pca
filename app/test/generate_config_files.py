@@ -42,9 +42,29 @@ def make_default_config_file(algorithm = 'power_iteration',
             }
     return dict
 
-def write_config(config, basedir, n):
-    with open(op.join(basedir,  'config.yaml'), 'w') as handle:
+def write_config(config, basedir, counter):
+    with open(op.join(basedir,  str(counter)+'config.yaml'), 'w') as handle:
         yaml.safe_dump(config, handle, default_flow_style=False, allow_unicode=True)
+
+
+def create_configs_power(output_folder, batch=False):
+    qr = ['federated_qr', 'no_qr']
+    init = ['approximate_pca', 'random']
+
+    counter = 0
+    for q in qr:
+        for i in init:
+            config = make_default_config_file(batch=batch,
+                                              algorithm='power_iteration',
+                                              qr=q,
+                                              init=i)
+            write_config(config=config, basedir=output_folder, counter=counter)
+            counter = counter + 1
+
+def create_configs_approx(output_folder, batch=True):
+    config = make_default_config_file(batch=batch, algorithm='approximate_pca')
+    write_config(config=config, basedir=output_folder, counter='')
+
 
 if __name__ == '__main__':
     parser = ap.ArgumentParser(description='Split complete data into test data for federated PCA')
@@ -53,15 +73,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     basedir = args.d
 
-    # make the output folder
     output_folder = op.join(basedir, 'config_files')
     os.makedirs(output_folder, exist_ok=True)
+    create_configs_approx(output_folder, batch=args.b)
+    create_configs_power(output_folder, batch=args.b)
 
-    config = make_default_config_file()
-    write_config(config=config, basedir=output_folder, n=3)
 
-    #algorithm = ['power_iteration']
-    #qr = ['federated_qr', 'no_qr']
-    #approximate_pca = [True, False]
-    #init = ['approximate_pca', 'random']
-    #batch = [True, False]
+

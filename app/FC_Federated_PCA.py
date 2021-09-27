@@ -45,7 +45,7 @@ class FCFederatedPCA:
             print('No more states')
 
     def get_state(self):
-        return self.get_state()
+        return self.state
 
     def copy_configuration(self, config, directory):
         self.config_available = config.config_available
@@ -61,15 +61,14 @@ class FCFederatedPCA:
         self.federated_qr = config.federated_qr
         self.max_iterations = config.max_iterations
         self.epsilon = config.epsilon
-        self.approximate_pca = config.approximate_pca
         self.init_method = config.init_method
 
         self.sep = config.sep
         self.has_rownames = config.has_rownames
         self.has_colnames = config.has_colnames
-        self.federated_dimensions = config.federated_dimensions
         self.allow_transmission = config.allow_transmission
         self.encryption = config.encryption
+        print('[Client] Configuation copied')
 
 
     def read_input_files(self):
@@ -86,10 +85,12 @@ class FCFederatedPCA:
     def init_random(self):
         print('init random')
         self.pca = SVD.init_random(self.tabdata, k=self.k)
+        self.k = self.pca.k
         return True
 
     def init_approximate(self):
         self.pca = SVD.init_local_subspace(self.tabdata, k=self.k)
+        self.k = self.pca.k
         return True
 
 
@@ -187,6 +188,20 @@ class FCFederatedPCA:
         self.local_eigenvector_norm = -1
         self.all_global_eigenvector_norms = []
 
+    def init_power_iteration(self):
+        self.iteration_counter = 0
+        self.converged = False
+        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+        self.out = {'local_h': self.pca.H}
+        if self.federated_qr == QR.FEDERATED_QR:
+            self.init_federated_qr()
+
+    def init_approximate_pca(self):
+        self.interation_counter = 0
+        self.converged = False
+        self.out = {'local_h': self.pca.H}
+        if self.federated_qr == QR.FEDERATED_QR:
+            self.init_federated_qr()
 
 
 
