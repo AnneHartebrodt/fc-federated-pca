@@ -13,8 +13,11 @@ do
     cp $controller_data_test_dir/config_files/$configf $controller_data_test_dir/data_split/$subdirs/config.yml
   done
 # start run
-  echo $clidir/cli.py
   python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs test_data/testing_pca/data_split/0,test_data/testing_pca/data_split/1,test_data/testing_pca/data_split/2 --app-image federated_pca_batch:latest --channel local --query-interval 1
   echo "test done"
+
+  # evaluate tests
+  # unzip data
+  # check
 done
 # evaluate results

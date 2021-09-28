@@ -111,7 +111,6 @@ def read_and_concatenate_eigenvectors(file_list):
         eig0 = eig0.values
         eigenvector_list.append(eig0)
     eig = np.concatenate(eigenvector_list, axis=0)
-
     return eig
 
 def wrapper(file_list, eigen_file_list, center=True):
