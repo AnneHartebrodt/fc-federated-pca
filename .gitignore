@@ -1,3 +1,7 @@
 .idea/
 venv
 test_data/
+__pycache__/
+PCA/__pycache__/
+app/test/test_batch/
+app/test/testing_pca/
