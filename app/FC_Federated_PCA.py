@@ -232,5 +232,4 @@ class FCFederatedPCA:
                                   self.pca.G[:, self.current_vector])
         self.current_vector = self.current_vector + 1
         self.out = {'local_eigenvector_norm': self.local_eigenvector_norm}
-
         return True

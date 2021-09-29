@@ -18,8 +18,8 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,
                            Step.READ_DATA]
         if self.algorithm == 'approximate_pca':
-            self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
-                                                 Step.UPDATE_H]
+            self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA]
+            self.queue_shutdown()
 
         if self.algorithm == 'power_iteration':
             if self.init_method == 'approximate_pca':
@@ -60,7 +60,6 @@ class ClientFCFederatedPCA(FCFederatedPCA):
             self.step_queue = self.step_queue + [Step.UPDATE_H]
             # If convergence not reached, update H and go on
             self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-
         self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = True

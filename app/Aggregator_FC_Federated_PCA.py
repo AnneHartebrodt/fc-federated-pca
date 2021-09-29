@@ -17,8 +17,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,Step.READ_DATA]
         if self.algorithm == 'approximate_pca':
             self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
-                                                 Step.AGGREGATE_SUBSPACES,
-                                                 Step.UPDATE_H]
+                                                 Step.AGGREGATE_SUBSPACES]
+            self.queue_shutdown()
         elif self.algorithm == 'power_iteration':
             if self.init_method == 'approximate_pca':
                 self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,

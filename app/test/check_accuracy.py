@@ -59,7 +59,7 @@ if __name__ == '__main__':
     print(args.f)
     os.makedirs(op.join(basedir, 'test_results'), exist_ok=True)
     federated_eigenvectors = read_and_concatenate_eigenvectors(args.f)
-    canconical_eigenvectors = pd.read_csv(args.c, header=None, index_col=None, sep='\t').values[0:3750, :]
+    canconical_eigenvectors = pd.read_csv(args.c, header=None, index_col=None, sep='\t').values
     angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors)
     config = read_config(configfile=args.e)
     ouput_table = create_result(angles, config['fc_pca']['algorithm'])

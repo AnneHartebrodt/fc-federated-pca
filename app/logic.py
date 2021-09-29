@@ -357,17 +357,19 @@ class AppLogic:
                         print(self.svd[i].data_incoming)
                         if (wait_for in self.svd[i].data_incoming.keys() and \
                                 len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
+                            self.svd[i].progress = 1.0
                             self.status_finished = True
-                            self.progress = 1.0
                             self.svd[i].step = Step.FINISHED
                     else:
                         self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
                         self.svd[i].send_data = True
                         self.svd[i].computation_done = True
                         self.progress = 1.0
+                        #self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
                         self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
-    
+
                 elif self.svd[i].step == Step.FINISHED:
+                    self.status_finished = True
                     print('App run completed')
     
                 else:
