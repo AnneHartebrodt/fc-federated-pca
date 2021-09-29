@@ -4,8 +4,6 @@ import time
 import jsonpickle
 import jsonpickle.ext.numpy as jsonpickle_numpy
 jsonpickle_numpy.register_handlers()
-import yaml
-from app.algo import local_computation, global_aggregation
 from app.Aggregator_FC_Federated_PCA import AggregatorFCFederatedPCA
 from app.Client_FC_FederatedPCA import ClientFCFederatedPCA
 from app.Steps import Step
@@ -46,6 +44,7 @@ class AppLogic:
         self.workflow_state = 'running'
         self.local_result = None
         self.global_result = None
+        self.progress = 0.0
 
         # === Web status ===
         self.web_status = 'index'
@@ -145,6 +144,7 @@ class AppLogic:
         # This method contains a state machine for the participant and coordinator instance
         while True:
             for i in range(len(self.svd)):
+                self.progress =self.svd[i].progress
                 self.message = self.svd[i].step.value
                 print("Current step " + str(self.svd[i].step))
                 if self.svd[i].step == Step.WAIT_FOR_PARAMS:
@@ -358,11 +358,13 @@ class AppLogic:
                         if (wait_for in self.svd[i].data_incoming.keys() and \
                                 len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
                             self.status_finished = True
+                            self.progress = 1.0
                             self.svd[i].step = Step.FINISHED
                     else:
                         self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
                         self.svd[i].send_data = True
                         self.svd[i].computation_done = True
+                        self.progress = 1.0
                         self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
     
                 elif self.svd[i].step == Step.FINISHED:

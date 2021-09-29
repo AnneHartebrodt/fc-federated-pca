@@ -46,7 +46,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         return True
 
     def update_h(self, incoming):
-
+        self.update_progess()
         # First, update the local G estimate
         self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
         self.pca.S = np.linalg.norm(self.pca.G, axis=1)

@@ -32,6 +32,7 @@ class FCFederatedPCA:
         self.outliers = []
         self.approximate_pca = True
         self.data_incoming = {}
+        self.progress = 0.0
 
 
     def next_state(self):
@@ -70,10 +71,13 @@ class FCFederatedPCA:
         self.encryption = config.encryption
         print('[Client] Configuation copied')
 
+    def update_progess(self):
+        ## allow 60 percent of the progress bar for the iterations
+        self.progress = 0.2 + (self.iteration_counter/self.max_iterations)*0.6
 
     def read_input_files(self):
         try:
-
+            self.progress = 0.1
             self.tabdata = TabData.from_file(self.input_file, header=self.has_colnames,
                                              index=self.has_rownames, sep=self.sep)
             self.computation_done = True
@@ -84,11 +88,13 @@ class FCFederatedPCA:
 
     def init_random(self):
         print('init random')
+        self.progress = 0.2
         self.pca = SVD.init_random(self.tabdata, k=self.k)
         self.k = self.pca.k
         return True
 
     def init_approximate(self):
+        self.progress = 0.2
         self.pca = SVD.init_local_subspace(self.tabdata, k=self.k)
         self.k = self.pca.k
         return True
@@ -114,9 +120,6 @@ class FCFederatedPCA:
         return True
 
     def save_pca(self):
-        print(self.eigenvalue_file)
-        print(self.left_eigenvector_file)
-        print(self.right_eigenvector_file)
         self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False
@@ -164,7 +167,6 @@ class FCFederatedPCA:
             print('Failed computing projections')
 
     def save_projections(self):
-        print(self.projection_file)
         self.pca.save_projections(self.projection_file, sep='\t')
         self.computation_done = True
         self.send_data = False
@@ -177,6 +179,7 @@ class FCFederatedPCA:
         self.send_data = False
 
     def queue_shutdown(self):
+        self.progress = 1.0
         self.step_queue = self.step_queue + [Step.SAVE_SVD, Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
                                              Step.FINALIZE]
 
@@ -204,6 +207,7 @@ class FCFederatedPCA:
             self.init_federated_qr()
 
     def compute_h_local_g(self):
+        self.update_progess()
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         self.out = {'local_h': self.pca.H}
         return True

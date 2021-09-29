@@ -30,6 +30,7 @@ def ctrl_status():
         "finished": logic.status_finished,
         "message": logic.message,
         "state": logic.workflow_state,
+        "progress": logic.progress,
     })
 
 
