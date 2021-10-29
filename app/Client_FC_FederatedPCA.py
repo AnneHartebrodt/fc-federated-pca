@@ -56,13 +56,15 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         if self.converged:
             self.pca.H = incoming['h_global']
             self.queue_shutdown()
+            self.send_data = False
         else:
             self.step_queue = self.step_queue + [Step.UPDATE_H]
             # If convergence not reached, update H and go on
             self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
+            self.out = {'local_h': self.pca.H}
+            self.send_data = True
         self.computation_done = True
-        self.send_data = True
+
         return True
 
     def queue_qr(self):
@@ -105,7 +107,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         return True
 
     def calculate_local_vector_conorms(self, incoming):
-        super(ClientFCFederatedPCA, self).calculate_local_vector_conorms()
+        super(ClientFCFederatedPCA, self).calculate_local_vector_conorms(incoming)
         self.computation_done = True
         self.send_data = True
         return True

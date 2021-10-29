@@ -67,18 +67,26 @@ class AppLogic:
         if self.config.batch:
             print('batch mode')
             print(self.config.directories)
-            for d, i in zip(self.config.directories, range(len(self.config.directories))):
+            i = 0
+            for d in self.config.directories:
 
-                if self.coordinator:
-                    self.svd[i] = AggregatorFCFederatedPCA()
+                if self.config.train_test:
+                    l = ['train', 'test']
                 else:
-                    self.svd[i] = ClientFCFederatedPCA()
-                print('Object created')
-                self.svd[i].step = Step.LOAD_CONFIG
-                self.svd[i].copy_configuration(self.config, d)
-                print('Configuartion copied')
-                self.svd[i].finalize_parameter_setup()
-                print('Setup finalized')
+                    l = ['']
+                for t in l:
+                    if self.coordinator:
+                        self.svd[i] = AggregatorFCFederatedPCA()
+                    else:
+                        self.svd[i] = ClientFCFederatedPCA()
+                    print('Object created')
+                    self.svd[i].step = Step.LOAD_CONFIG
+                    self.svd[i].copy_configuration(self.config, d, t)
+                    print('Configuration copied')
+                    self.svd[i].finalize_parameter_setup()
+                    print('Setup finalized')
+                    i = i + 1
+
         else:
             print('single mode')
             if self.coordinator:
@@ -87,7 +95,7 @@ class AppLogic:
                 self.svd[0] = ClientFCFederatedPCA()
             print('Object created')
             self.svd[0].step = Step.LOAD_CONFIG
-            self.svd[0].copy_configuration(self.config, '')
+            self.svd[0].copy_configuration(self.config)
             print('Configuartion copied')
             self.svd[0].finalize_parameter_setup()
 
@@ -143,9 +151,10 @@ class AppLogic:
     def app_flow(self):
         # This method contains a state machine for the participant and coordinator instance
         while True:
+            self.finish_count = 0
+            self.progress = self.svd[0].progress
+            self.message = self.svd[0].step.value
             for i in range(len(self.svd)):
-                self.progress =self.svd[i].progress
-                self.message = self.svd[i].step.value
                 print("Current step " + str(self.svd[i].step))
                 if self.svd[i].step == Step.WAIT_FOR_PARAMS:
                     wait_for = Step.LOAD_CONFIG
@@ -221,7 +230,7 @@ class AppLogic:
                 elif self.svd[i].step == Step.AGGREGATE_H:
                     if Step.COMPUTE_H_LOCAL in self.svd[i].data_incoming.keys():
                         wait_for = Step.COMPUTE_H_LOCAL
-                    elif Step.UPDATE_H in self.svd[i].data_incoming.keys():
+                    elif Step.UPDATE_H in self.svd[i].data_incoming.keys() :
                         wait_for = Step.UPDATE_H
                     else:
                         wait_for = Step.INIT_POWER_ITERATION
@@ -240,7 +249,7 @@ class AppLogic:
                             print(e)
     
                 elif self.svd[i].step == Step.UPDATE_H:
-                    if self.iteration == 0:
+                    if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
                         wait_for = Step.AGGREGATE_SUBSPACES
                     else:
                         wait_for = Step.AGGREGATE_H
@@ -252,7 +261,7 @@ class AppLogic:
                         incoming = self.svd[i].data_incoming[wait_for][key]
                         self.svd[i].data_incoming.pop(wait_for, None)
                         self.svd[i].update_h(incoming)
-                        self.iteration = self.iteration + 1
+
     
     
                 elif self.svd[i].step == Step.COMPUTE_LOCAL_NORM:
@@ -270,10 +279,8 @@ class AppLogic:
                         incoming = self.svd[i].data_incoming[wait_for][key]
                         # Empty incoming data
                         self.svd[i].data_incoming.pop(wait_for, None)
-                        try:
-                            self.svd[i].calculate_local_vector_conorms(incoming)
-                        except:
-                            print('Local co-norm computation failed')
+                        self.svd[i].calculate_local_vector_conorms(incoming)
+
     
                 elif self.svd[i].step == Step.ORTHOGONALISE_CURRENT:
                     wait_for = Step.AGGREGATE_CONORM
@@ -284,11 +291,9 @@ class AppLogic:
                         incoming = self.svd[i].data_incoming[wait_for][key]
                         # Empty incoming data
                         self.svd[i].data_incoming.pop(wait_for, None)
-                        try:
-                            self.svd[i].orthogonalise_current(incoming)
-                            self.svd[i].silent_step = True
-                        except:
-                            print('Orthogonalisation failed')
+
+                        self.svd[i].orthogonalise_current(incoming)
+                        self.svd[i].silent_step = True
     
                 elif self.svd[i].step == Step.AGGREGATE_NORM:
                     wait_for = Step.COMPUTE_LOCAL_NORM
@@ -300,10 +305,7 @@ class AppLogic:
                         incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
                         # Empty the incoming data (important for multiple iterations)
                         self.svd[i].data_incoming.pop(wait_for, None)
-                        try:
-                            self.svd[i].aggregate_eigenvector_norms(incoming)
-                        except:
-                            print("Eigenvector aggregatio failed")
+                        self.svd[i].aggregate_eigenvector_norms(incoming)
     
                 elif self.svd[i].step == Step.AGGREGATE_CONORM:
                     wait_for = Step.COMPUTE_LOCAL_CONORM
@@ -334,7 +336,6 @@ class AppLogic:
                             print('G normalisation failed')
     
                 elif self.svd[i].step == Step.COMPUTE_PROJECTIONS:
-
                     try:
                         self.svd[i].compute_projections()
                     except:
@@ -345,9 +346,25 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:
-                    if Step.UPDATE_H in self.svd[i].data_incoming.keys():
-                        self.svd[i].data_incoming.pop(Step.UPDATE_H, None)
-                    self.svd[i].save_pca()
+                    if not self.svd[i].federated_qr:
+                        if Step.AGGREGATE_H in self.svd[i].data_incoming.keys():
+                            wait_for == Step.AGGREGATE_H
+                        elif Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                            wait_for == Step.AGGREGATE_SUBSPACES
+                        # Data (H matrix) needs to be updated from the server
+                        if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            # Empty incoming data
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].update_and_save(incoming)
+
+                    # Data is available already
+                    else:
+                        self.svd[i].save_pca()
+
 
     
                 elif self.svd[i].step == Step.FINALIZE:
@@ -358,7 +375,7 @@ class AppLogic:
                         if (wait_for in self.svd[i].data_incoming.keys() and \
                                 len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
                             self.svd[i].progress = 1.0
-                            self.status_finished = True
+                            #self.status_finished = True
                             self.svd[i].step = Step.FINISHED
                     else:
                         self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
@@ -369,7 +386,10 @@ class AppLogic:
                         self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
 
                 elif self.svd[i].step == Step.FINISHED:
-                    self.status_finished = True
+                    self.finish_count=self.finish_count+1
+                    self.svd[i].out = {'finished': True, 'step': Step.FINISHED}
+                    if self.finish_count == len(self.clients):
+                        self.status_finished = True
                     print('App run completed')
     
                 else:
@@ -428,6 +448,7 @@ class AppLogic:
                         print('Dispatch failed')
             if outgoing_dict != {}:
                 self.data_outgoing = jsonpickle.encode(outgoing_dict)
+                self.iteration = self.iteration + 1
                 self.status_available = True
                 outgoing_dict = {}
 

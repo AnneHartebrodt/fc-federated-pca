@@ -38,6 +38,8 @@ class FCConfig:
         self.federated_dimensions = 'row'
         self.allow_transmission = False
         self.encryption = False
+        self.train_test = False
+
 
 
     def parse_configuration(self):
@@ -68,6 +70,7 @@ class FCConfig:
                 parameter_list = parameter_list['fc_pca']
 
                 self.batch = parameter_list['input']['batch']
+                self.train_test = parameter_list['input']['train_test']
                 print(self.batch)
                 if self.batch:
                     print('CONFIG: BATCH Mode')
@@ -75,10 +78,16 @@ class FCConfig:
                     for f in folders:
                         if op.isdir(op.join(INPUT_DIR, f)):
                             self.directories.append(f)
-                            os.makedirs(op.join(OUTPUT_DIR, f), exist_ok=True)
+                            if self.train_test:
+                                os.makedirs(op.join(OUTPUT_DIR, f, 'train'), exist_ok=True)
+                                os.makedirs(op.join(OUTPUT_DIR, f, 'test'), exist_ok=True)
+
+                            else:
+                                os.makedirs(op.join(OUTPUT_DIR, f), exist_ok=True)
                 # Files
                 try:
                     self.input_file = parameter_list['input']['data']
+
                 except KeyError:
                     print('YAML file does not follow specification: missing key '+ str('data'))
                     raise KeyError

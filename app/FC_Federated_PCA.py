@@ -14,6 +14,7 @@ from shutil import copyfile
 from shutil import copyfile
 from app.SVD import SVD
 from app.params import INPUT_DIR, OUTPUT_DIR
+import pathlib as pl
 
 class FCFederatedPCA:
     def __init__(self):
@@ -33,7 +34,7 @@ class FCFederatedPCA:
         self.approximate_pca = True
         self.data_incoming = {}
         self.progress = 0.0
-
+        self.silent_step=False
 
     def next_state(self):
         self.state = self.step_queue.pop(0)
@@ -48,15 +49,15 @@ class FCFederatedPCA:
     def get_state(self):
         return self.state
 
-    def copy_configuration(self, config, directory):
+    def copy_configuration(self, config, directory, train=''):
         self.config_available = config.config_available
         self.batch = config.batch
         self.directories = config.directories
-        self.input_file = op.join(INPUT_DIR, directory, config.input_file)
-        self.left_eigenvector_file = op.join(OUTPUT_DIR, directory, config.left_eigenvector_file)
-        self.right_eigenvector_file = op.join(OUTPUT_DIR, directory, config.right_eigenvector_file)
-        self.eigenvalue_file = op.join(OUTPUT_DIR, directory, config.eigenvalue_file)
-        self.projection_file = op.join(OUTPUT_DIR, directory, config.projection_file)
+        self.input_file = op.join(INPUT_DIR, directory, train, config.input_file)
+        self.left_eigenvector_file = op.join(OUTPUT_DIR, directory, train,  config.left_eigenvector_file)
+        self.right_eigenvector_file = op.join(OUTPUT_DIR, directory, train, config.right_eigenvector_file)
+        self.eigenvalue_file = op.join(OUTPUT_DIR, directory, train, config.eigenvalue_file)
+        self.projection_file = op.join(OUTPUT_DIR, directory, train, config.projection_file)
         self.k = config.k
         self.algorithm = config.algorithm
         self.federated_qr = config.federated_qr
@@ -69,6 +70,7 @@ class FCFederatedPCA:
         self.has_colnames = config.has_colnames
         self.allow_transmission = config.allow_transmission
         self.encryption = config.encryption
+
         print('[Client] Configuation copied')
 
     def update_progess(self):
@@ -119,7 +121,17 @@ class FCFederatedPCA:
         self.send_data = False
         return True
 
+    def update_and_save_pca(self, incoming):
+        # update PCA and save
+        self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
+        self.pca.S = np.linalg.norm(self.pca.G, axis=1)
+        self.pca.H = incoming['h_global']
+        self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
+        self.computation_done = True
+        self.send_data = False
+
     def save_pca(self):
+        # update PCA and save
         self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False

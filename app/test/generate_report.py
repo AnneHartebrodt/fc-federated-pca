@@ -15,8 +15,9 @@ import app.PCA.markdown_utils as md
 def write_markdown_report(basedir, report):
     files = os.listdir(basedir)
     fl = []
+    print(files)
     for f in files:
-        fl.append(pd.read_csv(op.join(basedir, f), sep='\t'))
+        fl.append(pd.read_csv(op.join(basedir, f), sep='\t', engine='python', header=0, index_col=None))
     table = pd.concat(fl)
 
     mdr = md.df_to_markdown(table)

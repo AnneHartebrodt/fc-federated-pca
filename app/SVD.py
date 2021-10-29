@@ -74,7 +74,7 @@ class SVD:
         return True
 
     def to_csv(self, left_eigenvector_file, right_eigenvector_file, eigenvalue_file, sep='\t'):
-
+        print('saving pca'+left_eigenvector_file)
         pd.DataFrame(self.H).to_csv(left_eigenvector_file, sep=sep, header=False, index=False)
         pd.DataFrame(self.G).to_csv(right_eigenvector_file, sep=sep, header=False, index=False)
         pd.DataFrame(self.S).to_csv(eigenvalue_file, sep=sep, header=False, index=False)

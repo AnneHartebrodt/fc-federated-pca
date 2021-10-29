@@ -94,8 +94,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
             self.step_queue = self.step_queue + [Step.AGGREGATE_H, Step.UPDATE_H]
             self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         # If convergence not reached, update H and go on
-
-        self.out = {'local_h': self.pca.H}
+            self.out = {'local_h': self.pca.H}
         self.computation_done = True
         self.send_data = False
         return True
@@ -172,7 +171,7 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         return True
 
     def calculate_local_vector_conorms(self, incoming):
-        super(AggregatorFCFederatedPCA, self).calculate_local_vector_conorms()
+        super(AggregatorFCFederatedPCA, self).calculate_local_vector_conorms(incoming)
         self.computation_done = True
         self.send_data = False
         return True

@@ -30,15 +30,26 @@ def read_config(configfile):
 
 
 
-def create_result(angles, config):
+def create_result(left_angles, right_angles,  config, run_id='NA', config_path='NA', result_path='NA'):
     l = []
     names = []
+    names.append('Run ID')
+    l.append(run_id)
+
+    names.append('Config file')
+    l.append(config_path)
+
+    names.append('Files')
+    l.append(result_path)
     for key in config:
         names.append(key)
         l.append(config[key])
-    for a in range(len(angles)):
-        names.append('EV'+str(a+1))
-        l.append(angles[a])
+    for a in range(len(left_angles)):
+        names.append('SV (l)'+str(a+1))
+        l.append(left_angles[a])
+    for a in range(len(right_angles)):
+        names.append('SV (r)'+str(a+1))
+        l.append(right_angles[a])
     data = pd.DataFrame(l).T
     data.columns = names
     return data
@@ -49,20 +60,35 @@ def create_result(angles, config):
 if __name__ == '__main__':
     parser = ap.ArgumentParser(description='Split complete data into test data for federated PCA')
     parser.add_argument('-d', metavar='DIRECTORY', type=str, help='output directory', default='.')
-    parser.add_argument('-f', metavar='FILES', type=str, help='filenames of output files', nargs='+')
-    parser.add_argument('-c', metavar='CANONICAL', type=str, help='filename of canonical solution')
+    parser.add_argument('-l', metavar='left eigenvectors', type=str, help='filenames left eigenvectors (only 1)')
+    parser.add_argument('-r', metavar='right eigenvectors', type=str, help='filename right eigenvectors ', nargs='+')
+    parser.add_argument('-L', metavar='CANONICAL', type=str, help='filename of canonical left solution')
+    parser.add_argument('-R', metavar='CANONICAL', type=str, help='filename of canonical right solution')
     parser.add_argument('-o', metavar='OUTPUT', type=str, help='filename of evaluation output')
     parser.add_argument('-e', metavar='CONFIG', type=str, help='config file')
     args = parser.parse_args()
     basedir = args.d
 
-    print(args.f)
+
     os.makedirs(op.join(basedir, 'test_results'), exist_ok=True)
-    federated_eigenvectors = read_and_concatenate_eigenvectors(args.f)
-    canconical_eigenvectors = pd.read_csv(args.c, header=None, index_col=None, sep='\t').values
-    angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors)
+    federated_eigenvectors = pd.read_csv(args.l, header=None, index_col=None, sep='\t').values
+    canconical_eigenvectors = pd.read_csv(args.L, header=None, index_col=None, sep='\t').values
+    left_angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors)
+    left_angles = [np.round(a, 2) for a in left_angles]
+
+    federated_eigenvectors = read_and_concatenate_eigenvectors(args.r)
+    print(federated_eigenvectors.shape)
+    canconical_eigenvectors = pd.read_csv(args.R, header=None, index_col=None, sep='\t').values
+    print(canconical_eigenvectors.shape)
+    right_angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors.T)
+    right_angles = [np.round(a, 2) for a in right_angles]
+
     config = read_config(configfile=args.e)
-    ouput_table = create_result(angles, config['fc_pca']['algorithm'])
+    ouput_table = create_result(left_angles, right_angles, config['fc_pca']['algorithm'],
+                                run_id=args.o,
+                                config_path=args.e,
+                                result_path = args.R
+                                )
     ouput_table.to_csv(op.join(op.join(basedir, 'test_results', args.o)), sep='\t', index=False)
 
 
