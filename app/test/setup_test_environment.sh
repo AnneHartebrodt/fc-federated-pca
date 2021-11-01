@@ -8,7 +8,7 @@ batchcount=3
 k=10
 
 # generate the data
-python generate_test_data.py -d $outputfolder -f data.tsv -n $samples -m $features -s $seed -b $batchcount
+python generate_test_data.py -d $outputfolder -f data.tsv -n $samples -m $features -s $seed -b $batchcount --means 3,6,1,13,2,3,1,4,89,2 --stds 5,4,3,2,1,1,1,1,1,1
 
 #compute canonical solution
 python compute_canonical_solution.py -d $outputfolder -f data.tsv -k $k -s $seed -b True --header 0 --transpose True

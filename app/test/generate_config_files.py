@@ -51,9 +51,10 @@ def write_config(config, basedir, counter):
         yaml.safe_dump(config, handle, default_flow_style=False, allow_unicode=True)
 
 
-def create_configs_power(output_folder, batch=False, train_test=False, maxit=500):
-    qr = ['federated_qr', 'no_qr']
-    init = ['approximate_pca', 'random']
+def create_configs_power(output_folder, batch=False, train_test=False, maxit=500,     qr = ['federated_qr', 'no_qr'],
+                         init=['approximate_pca', 'random']):
+
+
 
     counter = 0
     for q in qr:
@@ -84,8 +85,8 @@ if __name__ == '__main__':
 
     output_folder = op.join(basedir, args.o, 'config_files')
     os.makedirs(output_folder, exist_ok=True)
-    count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=5)
-    create_configs_approx(output_folder,count, batch=args.b, train_test= args.t, maxit=5)
+    count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=50, qr=['no_qr'])
+    create_configs_approx(output_folder,count, batch=args.b, train_test= args.t, maxit=50)
 
 
 

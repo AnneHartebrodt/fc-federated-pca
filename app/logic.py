@@ -21,6 +21,7 @@ class AppLogic:
 
         # Will stop execution when True
         self.status_finished = False
+        self.finish_count=0
 
         # === Data ===
         self.data_outgoing = None
@@ -95,7 +96,7 @@ class AppLogic:
                 self.svd[0] = ClientFCFederatedPCA()
             print('Object created')
             self.svd[0].step = Step.LOAD_CONFIG
-            self.svd[0].copy_configuration(self.config)
+            self.svd[0].copy_configuration(self.config, '', '')
             print('Configuartion copied')
             self.svd[0].finalize_parameter_setup()
 
@@ -151,7 +152,6 @@ class AppLogic:
     def app_flow(self):
         # This method contains a state machine for the participant and coordinator instance
         while True:
-            self.finish_count = 0
             self.progress = self.svd[0].progress
             self.message = self.svd[0].step.value
             for i in range(len(self.svd)):
@@ -346,11 +346,10 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:
-                    if not self.svd[i].federated_qr:
-                        if Step.AGGREGATE_H in self.svd[i].data_incoming.keys():
-                            wait_for == Step.AGGREGATE_H
-                        elif Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
-                            wait_for == Step.AGGREGATE_SUBSPACES
+                    if self.svd[i].algorithm == 'approximate_pca':
+                        if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                            wait_for = Step.AGGREGATE_SUBSPACES
+                            print('CLIENT waiting for parameters ' + str(wait_for))
                         # Data (H matrix) needs to be updated from the server
                         if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
                             print("[CLIENT] Process aggregated result from coordinator...", flush=True)
@@ -359,7 +358,7 @@ class AppLogic:
                             incoming = self.svd[i].data_incoming[wait_for][key]
                             # Empty incoming data
                             self.svd[i].data_incoming.pop(wait_for, None)
-                            self.svd[i].update_and_save(incoming)
+                            self.svd[i].update_and_save_pca(incoming)
 
                     # Data is available already
                     else:
@@ -376,19 +375,19 @@ class AppLogic:
                                 len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
                             self.svd[i].progress = 1.0
                             #self.status_finished = True
+                            self.finish_count = self.finish_count + 1
                             self.svd[i].step = Step.FINISHED
                     else:
                         self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
                         self.svd[i].send_data = True
                         self.svd[i].computation_done = True
-                        self.progress = 1.0
-                        #self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
+                        self.svd[i].progress = 1.0
                         self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
 
+
                 elif self.svd[i].step == Step.FINISHED:
-                    self.finish_count=self.finish_count+1
-                    self.svd[i].out = {'finished': True, 'step': Step.FINISHED}
-                    if self.finish_count == len(self.clients):
+                    # Wait for all clients to be finished.
+                    if self.finish_count == len(self.svd):
                         self.status_finished = True
                     print('App run completed')
     
@@ -453,7 +452,7 @@ class AppLogic:
                 outgoing_dict = {}
 
 
-            time.sleep(1)
+            time.sleep(0.1)
 
 
 logic = AppLogic()

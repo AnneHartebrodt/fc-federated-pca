@@ -191,7 +191,7 @@ class FCFederatedPCA:
         self.send_data = False
 
     def queue_shutdown(self):
-        self.progress = 1.0
+        self.progress = 0.9
         self.step_queue = self.step_queue + [Step.SAVE_SVD, Step.COMPUTE_PROJECTIONS, Step.SAVE_PROJECTIONS,
                                              Step.FINALIZE]
 

@@ -36,11 +36,11 @@ def create_result(left_angles, right_angles,  config, run_id='NA', config_path='
     names.append('Run ID')
     l.append(run_id)
 
-    names.append('Config file')
-    l.append(config_path)
+    #names.append('Config file')
+    #l.append(config_path)
 
-    names.append('Files')
-    l.append(result_path)
+    #names.append('Files')
+    #l.append(result_path)
     for key in config:
         names.append(key)
         l.append(config[key])
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     print(federated_eigenvectors.shape)
     canconical_eigenvectors = pd.read_csv(args.R, header=None, index_col=None, sep='\t').values
     print(canconical_eigenvectors.shape)
-    right_angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors.T)
+    right_angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors)
     right_angles = [np.round(a, 2) for a in right_angles]
 
     config = read_config(configfile=args.e)

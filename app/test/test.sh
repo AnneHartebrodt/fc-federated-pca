@@ -11,7 +11,8 @@ pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
 
 count=1
 outdirs=()
-suffix_list=( "app_test/batch_cross" "app_test/batch" "app_test/single" )
+# "app_test/single" "app_test/batch_cross" "app_test/batch"
+suffix_list=( "app_test/single" "app_test/batch_cross" "app_test/batch")
 
 for current_test_dir_suffix in "${suffix_list[@]}"
 do
@@ -36,9 +37,9 @@ do
 
 
   #echo $dirs
-  echo python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 1 \
+  echo python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
     --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
-  python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 1 \
+  python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
     --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
   echo "test done"
 done

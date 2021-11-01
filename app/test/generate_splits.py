@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', metavar='INPUT_FILE', type=str, help='filename of data file')
     parser.add_argument('-F', metavar='INPUT_FILE', type=str, help='filename of data file (full path)', default=None)
     parser.add_argument('-n', metavar='SITES', type=int, help='Number of sites')
-    parser.add_argument('-s', metavar='SEED', type=int, help='random seed', default=11)
+    parser.add_argument('-s', metavar='SEED/FOLDER_NAME', type=int, help='random seed.', default=11)
     parser.add_argument('-b', metavar='BATCH', type=bool, help='batch mode', default=False)
     parser.add_argument('-t', metavar='TRAIN', type=bool, help='batch mode', default=False)
     parser.add_argument('--header', metavar='HEADER', type=int, help='header (line number)', default=None)
