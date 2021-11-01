@@ -1,0 +1,24 @@
+{% extends "index.html" %}
+{% block content %}
+    {% if shutdown_triggered %}
+        <div>Shutdown triggered - waiting for all clients to shut down.</div>
+    {% else %}
+        {% if is_coordinator %}
+            <div style="padding: 2em">Once you shut down the application, the data will be saved and available to the
+                next app in the workflow. You cannot go back,
+                so be sure that you have performed all necessary steps.
+            </div>
+            <form class="pure-form" action="./shutdown_application" method="post"
+                  onsubmit="return confirm('Do you really want to shut down the application?');"
+                  enctype=multipart/form-data>
+                <div class="input-group-run">
+                    <input value="Shutdown application" style="margin: 20px; float: right" type="submit"
+                           class="btn btn-primary btn-lg">
+                </div>
+            </form>
+        {% else %}
+            <div>Only the master can shutdown the application.</div>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+

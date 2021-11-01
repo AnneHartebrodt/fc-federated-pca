@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+{% block upload %}
+        <script>
+    function showSelect() {
+        var select = document.getElementById('global_group');
+        if (select.className == "show"){
+            select.className = 'hide';
+        }
+        else{
+            select.className = 'show';
+        }
+
+    }
+
+    function hide(){
+     document.getElementById("global_group").style.display = 'none';
+    }
+    </script>
+    <fieldset>
+        <form class="pure-form" action="./run" method="post" enctype=multipart/form-data>
+
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Data Upload<div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">Enter the filename of your data RELATIVE to your base directory. E.g. if your data is in <code>/home/fc_user/workflow/data/mydata.csv</code> and your base directory is <code>/home/fc_user/workflow/</code> you have to enter <code>data/mydata.csv</code>.</span>
+                </div></legend>
+                <label for="file_input"><input type="text" name="file" class="form-control-file input-group-prepend"
+                                               id="file_input" required="True"></label>
+            </div>
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Data settings
+                    <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">The fixed dimension requires rownames, because the variables need to be matched accross sites. If you are unsure how to format your data please refer to our Help section or contact you study coordinators.</span>
+                </div></legend>
+                <input type="checkbox" id="rownames" name="rownames" value=0 checked="checked">
+                <label for="rownames"> Rownames </label><br>
+                <input type="checkbox" id="colnames" name="colnames" value=0 checked="checked">
+                <label for="colnames"> Column Names </label><br>
+            </div>
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Field delimiter</legend>
+                <input type="radio" id="comma" name="sep" value=",">
+                <label for="comma">, (comma) </label> &nbsp;
+                <input type="radio" id="semicolon" name="sep" value=";">
+                <label for="semicolon">; (semicolon)</label> &nbsp;
+                <input type="radio" id="tab" name="sep" value="\t" checked="checked">
+                <label for="tab">\t (tab)</label>
+            </div>
+            {% if is_coordinator %}
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Algorithm settings: <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">Info</span>
+                </div></legend>
+                <label> Algorithm</label><br>
+                <select name="algorithm" id="algorithm">
+                    <option value="subspace-iteration">Subspace Iteration</option>
+                     <option value="power-iteration">Power Iteration</option>
+                </select><br><br>
+
+                <label> # Principal Components</label><br>
+                <input type="number" class="form-control" min="1" value=10 name="pcs"><br><br>
+                <label> Max. iterations </label><br>
+                <input type="number" class="form-control" min="1" value=2000 name="max_iterations"><br>
+                <label> Epsilon </label><br>
+                <input type="number" class="form-control" min="1e-12" value=1e-9 name="epsilon"><br>
+
+            </div>
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Data scaling <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">Info</span>
+                </div></legend>
+                <input type="checkbox" id="center" name="center" value="center">
+                <label for="center"> Center variables </label><br><br>
+                <input type="checkbox" id="scale_variance" name="scale_variance" value="scale_variance">
+                <label for="scale_variance"> Scale variables to unit variance </label>
+                <label> Transform</label><br>
+                <select name="transform" id="transform">
+                    <option value="no_transform">None</option>
+                     <option value="log2">Log2</option>
+                     <option value="log10">Log10</option>
+                </select><br><br>
+            </div>
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Privacy settings <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">Info</span>
+                </div></legend>
+                <input type="checkbox" id="show_results" name="show_results" value="show_results">
+                <label for="show_results"> Allow rerun of PCA after outlier removal </label>
+                <input type="checkbox" id="transmit_projections" name="transmit_projections"
+                       value="transmit_projections" onchange="showSelect();">
+                <label for="transmit_projections"> Allow transmission of projections to other
+                    participants </label><br><br>
+                <input type="checkbox" id="allow_rerun" name="allow_rerun" value="allow_rerun">
+                <label for="allow_rerun"> Allow rerun of PCA after outlier removal </label>
+            </div>
+            <div class="box" style="padding: 0.4rem; padding-bottom: 1rem">
+                <legend>Outlier removal mode <div class="tooltip"> <img src="./static/images/help.png" height="20px" alt="Help" />
+                    <span class="tooltiptext">Info</span>
+                </div></legend>
+                <div id="local_group">
+                <input type="radio" id="noout" name="outlierremoval" value="no_removal" checked="checked">
+                <label for="noout">none</label>
+                </div>
+                <div id="local_group">
+                <input type="radio" id="local" name="outlierremoval" value="local">
+                <label for="local">local</label>
+                </div>
+                <div class="hide" id="global_group">
+                <input type="radio" id="global" name="outlierremoval" value="global">
+                <label for="global">global</label>
+                </div>
+            </div>
+    {% endif %}
+            <div class="input-group-run">
+                <input value="Run" style="margin: 20px; float: right" type="submit"
+                       class="btn btn-primary btn-lg">
+            </div>
+        </form>
+    </fieldset>
+
+{% endblock %}

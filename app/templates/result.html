@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+{% block upload %}
+    <div id="container" style="width: 45%; height: 600px; float: left"></div>
+    <div style="width: 45%; height: 600px; float: right">
+        <h2>Global Parameters</h2>
+        <p><b># of PCs: </b> {{ pcs }}</p>
+    </div>
+    <div>
+        <p>Use 'lasso select' to select outliers. </p>
+        <p>Click the 'Done!' button to submit your choice. You do not have to select outliers.</p>
+    </div>
+{% endblock %}
+{% block result %}
+    <div class="chart" id="bargraph"></div>
+    <!---<input type="button" value="Rerun" id="calc" class="my-button">--->
+    <input type="button" value="Save and shutdown" id="calc2" class="my-button-shutdown">
+    <script>
+        myPlot = document.getElementById('bargraph')
+        var graphs = {{plot | safe}};
+        Plotly.plot('bargraph',graphs,{});
+        console.log(graphs)
+        console.log('Test')
+        var selected = [];
+        var color1 = '#FF0000';
+        var color1Light = '#0000FF';
+        var N = graphs[0]['x'].length
+        console.log(N)
+        var colors = [];
+        for(var i = 0; i < N; i++) colors.push(color1Light);
+        var preselected = []
+
+        myPlot.on('plotly_selected', function(eventData) {
+            //delete points from selected
+            selected = []
+          console.log(eventData.points)
+          eventData.points.forEach(function(pt) {
+                // Check if point in array
+                  if (preselected.includes(pt.pointNumber)){
+                      colors[pt.pointNumber] = color1Light;
+                      preselected.slice(preselected.indexOf(pt.pointNumber),1)
+                  }
+                  else {
+                      selected.push(pt.pointNumber)
+                      colors[pt.pointNumber] = color1;
+                  }
+          });
+            preselected.push(...selected)
+            console.log(preselected)
+            console.log(selected)
+            Plotly.restyle(myPlot, 'marker.color', [colors], [0]);
+});
+    </script>
+    <script>
+        function addSubmit() {
+            var remove = {'selected': selected}
+            $.ajax({
+                url: "./shutdown",
+                type: "POST",
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(remove),
+                dataType: "json",
+                success: window.location.replace('./loading')
+            });
+
+        }
+
+        $('.my-button-shutdown').on('click', addSubmit);
+    </script>
+<script>
+        function addSubmit() {
+            var remove = {'selected': selected}
+            $.ajax({
+                url: "./rerun",
+                type: "POST",
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(remove),
+                dataType: "json",
+                success: window.location.replace('./loading')
+            });
+
+        }
+
+        $('.my-button').on('click', addSubmit);
+    </script>
+{% endblock %}

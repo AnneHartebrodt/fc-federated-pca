@@ -1,11 +1,14 @@
 import shutil
 import threading
 import time
-
 import jsonpickle
-import yaml
-
-from app.algo import local_computation, global_aggregation
+import jsonpickle.ext.numpy as jsonpickle_numpy
+jsonpickle_numpy.register_handlers()
+from app.Aggregator_FC_Federated_PCA import AggregatorFCFederatedPCA
+from app.Client_FC_FederatedPCA import ClientFCFederatedPCA
+from app.Steps import Step
+from app.QR_params import QR
+from app.config import FCConfig
 
 
 class AppLogic:
@@ -18,9 +21,9 @@ class AppLogic:
 
         # Will stop execution when True
         self.status_finished = False
+        self.finish_count=0
 
         # === Data ===
-        self.data_incoming = []
         self.data_outgoing = None
 
         # === Parameters set during setup ===
@@ -28,9 +31,7 @@ class AppLogic:
         self.coordinator = None
         self.clients = None
 
-        # === Directories, input files always in INPUT_DIR. Write your output always in OUTPUT_DIR
-        self.INPUT_DIR = "/mnt/input"
-        self.OUTPUT_DIR = "/mnt/output"
+
 
         # === Variables from config.yml
         self.input_filename = None
@@ -40,9 +41,19 @@ class AppLogic:
         # === Internals ===
         self.thread = None
         self.iteration = 0
-        self.progress = "not started yet"
+        self.message = 'Starting'
+        self.workflow_state = 'running'
         self.local_result = None
         self.global_result = None
+        self.progress = 0.0
+
+        # === Web status ===
+        self.web_status = 'index'
+
+
+        # === FCFederatedPCA instance ===
+        self.svd = None
+
 
     def handle_setup(self, client_id, master, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
@@ -50,150 +61,398 @@ class AppLogic:
         self.coordinator = master
         self.clients = clients
         print(f"Received setup: {self.id} {self.coordinator} {self.clients}", flush=True)
+        self.configure()
 
+        self.svd = {}
+        # batch config loops over the files
+        if self.config.batch:
+            print('batch mode')
+            print(self.config.directories)
+            i = 0
+            for d in self.config.directories:
+
+                if self.config.train_test:
+                    l = ['train', 'test']
+                else:
+                    l = ['']
+                for t in l:
+                    if self.coordinator:
+                        self.svd[i] = AggregatorFCFederatedPCA()
+                    else:
+                        self.svd[i] = ClientFCFederatedPCA()
+                    print('Object created')
+                    self.svd[i].step = Step.LOAD_CONFIG
+                    self.svd[i].copy_configuration(self.config, d, t)
+                    print('Configuration copied')
+                    self.svd[i].finalize_parameter_setup()
+                    print('Setup finalized')
+                    i = i + 1
+
+        else:
+            print('single mode')
+            if self.coordinator:
+                self.svd[0] = AggregatorFCFederatedPCA()
+            else:
+                self.svd[0] = ClientFCFederatedPCA()
+            print('Object created')
+            self.svd[0].step = Step.LOAD_CONFIG
+            self.svd[0].copy_configuration(self.config, '', '')
+            print('Configuartion copied')
+            self.svd[0].finalize_parameter_setup()
+
+        # set the pointer to the first action
+        for i in range(len(self.svd)):
+            self.svd[i].step = self.svd[i].next_state()
+
+        print('start flow')
         self.thread = threading.Thread(target=self.app_flow)
         self.thread.start()
 
-    def handle_incoming(self, data):
+    def handle_incoming(self, data, query):
         # This method is called when new data arrives
         print("Process incoming data....", flush=True)
-        self.data_incoming.append(data.read())
+        client = query.getunicode('client')
+        print('client: '+str(client))
+        incoming = data.read()
+        # Here we use a dictionary because some information is client
+        # specific
+        incoming = jsonpickle.decode(incoming)
+        for i in incoming.keys():
+            j = int(i)
+            step = incoming[i]['step']
+            if step in self.svd[j].data_incoming.keys():
+                self.svd[j].data_incoming[step][client] = incoming[i]
+            else:
+                self.svd[j].data_incoming[step] = {}
+                self.svd[j].data_incoming[step][client] = incoming[i]
+        print("Process incoming data.... DONE!", flush=True)
+
+
+    def configure(self):
+        print("[CLIENT] Parsing parameter file...", flush=True)
+        if self.id is not None:  # Test is setup has happened already
+            # parse parameters
+            self.config = FCConfig()
+            print('Config created')
+            self.config.parse_configuration()
+            print("[CLIENT] finished parsing parameter file.", flush=True)
+
+
+
+
 
     def handle_outgoing(self):
         print("Process outgoing data...", flush=True)
         # This method is called when data is requested
+        outgoing_data = self.data_outgoing
+        self.data_outgoing = None
         self.status_available = False
-        return self.data_outgoing
-
-    def read_config(self):
-        with open(self.INPUT_DIR + "/config.yml") as f:
-            config = yaml.load(f, Loader=yaml.FullLoader)["fc_template"]
-            self.input_filename = config["files"]["input_filename"]
-            self.sep = config["files"]["sep"]
-            self.output_filename = config["files"]["output_filename"]
-        shutil.copyfile(self.INPUT_DIR + "/config.yml", self.OUTPUT_DIR + "/config.yml")
-        print(f"Read config file.", flush=True)
+        return outgoing_data
 
     def app_flow(self):
         # This method contains a state machine for the participant and coordinator instance
-
-        # === States ===
-        state_initializing = 1
-        state_read_input = 2
-        state_local_computation = 3
-        state_wait_for_aggregation = 4
-        state_global_aggregation = 5
-        state_finish = 6
-
-        # Initial state
-        state = state_initializing
         while True:
+            self.progress = self.svd[0].progress
+            self.message = self.svd[0].step.value
+            for i in range(len(self.svd)):
+                print("Current step " + str(self.svd[i].step))
+                if self.svd[i].step == Step.WAIT_FOR_PARAMS:
+                    wait_for = Step.LOAD_CONFIG
+                    print('CLIENT waiting for parameters ' + str(wait_for))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                        try:
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].set_parameters(incoming)
+                        except Exception as e:
 
-            if state == state_initializing:
-                self.progress = "initializing..."
-                print("[CLIENT] Initializing...", flush=True)
-                if self.id is not None:  # Test is setup has happened already
-                    if self.coordinator:
-                        print("I am the coordinator.", flush=True)
+                            print("Error loading configuration")
+                            print(e)
+                        
+                elif self.svd[i].step == Step.READ_DATA:
+                    wait_for = Step.WAIT_FOR_PARAMS
+                    print("[CLIENT] Read input...", flush=True)
+                    self.svd[i].read_input_files()
+                    self.svd[i].data_incoming.pop(wait_for, None)
+                    print("[CLIENT] Read input finished.", flush=True)
+    
+                elif self.svd[i].step == Step.INIT_POWER_ITERATION:
+                    self.iteration = self.iteration + 1
+                    self.svd[i].init_random()
+                    self.svd[i].init_power_iteration()
+    
+                elif self.svd[i].step == Step.APPROXIMATE_LOCAL_PCA:
+                    self.svd[i].init_approximate()
+                    self.svd[i].init_approximate_pca()
+    
+                elif self.svd[i].step == Step.AGGREGATE_SUBSPACES:
+                    wait_for = Step.APPROXIMATE_LOCAL_PCA
+                    print('CLIENT waiting for parameters ' + str(wait_for))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
+                        print("[COORDINATOR] Received data of all participants.", flush=True)
+                        print("[COORDINATOR] Aggregate results...", flush=True)
+                        # Decode received data of each client
+                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                        # Empty the incoming data (important for multiple iterations)
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        self.svd[i].aggregate_local_subspaces(incoming)
+    
+                elif self.svd[i].step == Step.COMPUTE_G_LOCAL:
+                    if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                        wait_for = Step.AGGREGATE_SUBSPACES
+                    elif Step.AGGREGATE_H in self.svd[i].data_incoming.keys():
+                        wait_for = Step.AGGREGATE_H
+                    elif Step.INIT_POWER_ITERATION in self.svd[i].data_incoming.keys():
+                        wait_for = Step.INIT_POWER_ITERATION
+                    print('CLIENT waiting for parameters ' + str(wait_for))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                        # Decode broadcasted data
+                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                        incoming = self.svd[i].data_incoming[wait_for][key]
+                        # Empty incoming data
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        try:
+                            self.svd[i].compute_g(incoming)
+                            self.svd[i].silent_step = True
+                        except:
+                            print('G computation failed')
+    
+                elif self.svd[i].step == Step.COMPUTE_H_LOCAL:
+                    if self.svd[i].federated_qr == QR.FEDERATED_QR:
+                        try:
+                            print('Computing H')
+                            self.svd[i].compute_h_local_g()
+                        except Exception as e:
+                            print('H computation failed')
+    
+                elif self.svd[i].step == Step.AGGREGATE_H:
+                    if Step.COMPUTE_H_LOCAL in self.svd[i].data_incoming.keys():
+                        wait_for = Step.COMPUTE_H_LOCAL
+                    elif Step.UPDATE_H in self.svd[i].data_incoming.keys() :
+                        wait_for = Step.UPDATE_H
                     else:
-                        print("I am a participating client.", flush=True)
-                    state = state_local_computation
-                print("[CLIENT] Initializing finished.", flush=True)
+                        wait_for = Step.INIT_POWER_ITERATION
+                    print('COORDINATOR waiting for parameters ' + str(wait_for) + 'Recieved '+str(len(self.svd[i].data_incoming[wait_for])))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
+                        print("[COORDINATOR] Received data of all participants.", flush=True)
+                        print("[COORDINATOR] Aggregate results...", flush=True)
+                        try:
+                            # Decode received data of each client
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].aggregate_h(incoming)
+                        except Exception as e:
+                            print('H aggregation failed')
+                            print(e)
+    
+                elif self.svd[i].step == Step.UPDATE_H:
+                    if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                        wait_for = Step.AGGREGATE_SUBSPACES
+                    else:
+                        wait_for = Step.AGGREGATE_H
+                    print('CLIENT waiting for parameters ' + str(wait_for))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                        # Decode broadcasted data
+                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                        incoming = self.svd[i].data_incoming[wait_for][key]
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        self.svd[i].update_h(incoming)
 
-            if state == state_read_input:
-                self.progress = "read input..."
-                print("[CLIENT] Read input...", flush=True)
-                # Read the config file
-                self.read_config()
-                # Here you could read in your input files
-                state = state_local_computation
-                print("[CLIENT] Read input finished.", flush=True)
+    
+    
+                elif self.svd[i].step == Step.COMPUTE_LOCAL_NORM:
+                    if self.svd[i].silent_step:
+                        self.svd[i].silent_step = False
+                        self.svd[i].compute_local_eigenvector_norm()
+    
+    
+                elif self.svd[i].step == Step.COMPUTE_LOCAL_CONORM:
+                    wait_for = Step.AGGREGATE_NORM
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                        # Decode broadcasted data
+                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                        incoming = self.svd[i].data_incoming[wait_for][key]
+                        # Empty incoming data
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        self.svd[i].calculate_local_vector_conorms(incoming)
 
-            if state == state_local_computation:
-                self.progress = "compute local results..."
-                print("[CLIENT] Compute local results...", flush=True)
-                self.progress = 'computing...'
+    
+                elif self.svd[i].step == Step.ORTHOGONALISE_CURRENT:
+                    wait_for = Step.AGGREGATE_CONORM
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                        # Decode broadcasted data
+                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                        incoming = self.svd[i].data_incoming[wait_for][key]
+                        # Empty incoming data
+                        self.svd[i].data_incoming.pop(wait_for, None)
 
-                # Compute local results
-                local_results = local_computation()
-                # Encode local results to send it to coordinator
-                data_to_send = jsonpickle.encode(local_results)
+                        self.svd[i].orthogonalise_current(incoming)
+                        self.svd[i].silent_step = True
+    
+                elif self.svd[i].step == Step.AGGREGATE_NORM:
+                    wait_for = Step.COMPUTE_LOCAL_NORM
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
+                        print("[COORDINATOR] Received data of all participants.", flush=True)
+                        print("[COORDINATOR] Aggregate results...", flush=True)
+                        # Decode received data of each client
+                        # the parameters are client specific
+                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                        # Empty the incoming data (important for multiple iterations)
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        self.svd[i].aggregate_eigenvector_norms(incoming)
+    
+                elif self.svd[i].step == Step.AGGREGATE_CONORM:
+                    wait_for = Step.COMPUTE_LOCAL_CONORM
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
+                        print("[COORDINATOR] Received data of all participants.", flush=True)
+                        print("[COORDINATOR] Aggregate results...", flush=True)
+                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                        # Empty the incoming data (important for multiple iterations)
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        try:
+                            self.svd[i].aggregate_conorms(incoming)
+                        except:
+                            print('Co-norm aggregation failed')
+    
+                elif self.svd[i].step == Step.NORMALISE_G:
+                    wait_for = Step.AGGREGATE_NORM
+                    print('CLIENT waiting for parameters ' + str(wait_for))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                        # Decode broadcasted data
+                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                        incoming = self.svd[i].data_incoming[wait_for][key]
+                        # Empty incoming data
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        try:
+                            self.svd[i].normalise_orthogonalised_matrix(incoming)
+                        except:
+                            print('G normalisation failed')
+    
+                elif self.svd[i].step == Step.COMPUTE_PROJECTIONS:
+                    try:
+                        self.svd[i].compute_projections()
+                    except:
+                        print('Computation of projections failed.')
+    
+                elif self.svd[i].step == Step.SAVE_PROJECTIONS:
+                    self.svd[i].save_projections()
+    
+    
+                elif self.svd[i].step == Step.SAVE_SVD:
+                    if self.svd[i].algorithm == 'approximate_pca':
+                        if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                            wait_for = Step.AGGREGATE_SUBSPACES
+                            print('CLIENT waiting for parameters ' + str(wait_for))
+                        # Data (H matrix) needs to be updated from the server
+                        if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            # Empty incoming data
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].update_and_save_pca(incoming)
 
-                if self.coordinator:
-                    # if the client is the coordinator: add the local results directly to the data_incoming array
-                    self.data_incoming.append(data_to_send)
-                    # go to state where the coordinator is waiting for the local results and aggregates them
-                    state = state_global_aggregation
+                    # Data is available already
+                    else:
+                        self.svd[i].save_pca()
+
+
+    
+                elif self.svd[i].step == Step.FINALIZE:
+                    wait_for = Step.FINALIZE
+                    if self.coordinator:
+                        print('CLIENT waiting for parameters ' + str(wait_for))
+                        print(self.svd[i].data_incoming)
+                        if (wait_for in self.svd[i].data_incoming.keys() and \
+                                len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
+                            self.svd[i].progress = 1.0
+                            #self.status_finished = True
+                            self.finish_count = self.finish_count + 1
+                            self.svd[i].step = Step.FINISHED
+                    else:
+                        self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
+                        self.svd[i].send_data = True
+                        self.svd[i].computation_done = True
+                        self.svd[i].progress = 1.0
+                        self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
+
+
+                elif self.svd[i].step == Step.FINISHED:
+                    # Wait for all clients to be finished.
+                    if self.finish_count == len(self.svd):
+                        self.status_finished = True
+                    print('App run completed')
+    
                 else:
-                    # if the client is not the cooridnator: set data_outgoing and set status_available to true
-                    self.data_outgoing = data_to_send
-                    self.status_available = True
-                    # go to state where the client is waiting for the aggregated results
-                    state = state_wait_for_aggregation
-                    print('[CLIENT] Send data to coordinator', flush=True)
-                print("[CLIENT] Compute local results finished.", flush=True)
+                    print("[CLIENT] NO SUCH STATE", flush=True)
 
-            if state == state_wait_for_aggregation:
-                self.progress = "wait for aggregated results..."
-                print("[CLIENT] Wait for aggregated results from coordinator...", flush=True)
-                # Wait until received broadcast data from coordinator
-                if len(self.data_incoming) > 0:
-                    print("[CLIENT] Process aggregated result from coordinator...", flush=True)
-                    # Decode broadcasted data
-                    self.global_result = jsonpickle.decode(self.data_incoming[0])
-                    # Empty incoming data
-                    self.data_incoming = []
-                    # Go to nex state (finish)
-                    state = state_finish
-                    print("[CLIENT] Processing aggregated results finished.", flush=True)
+            outgoing_dict = {}
+            for i in range(len(self.svd)):
+                # Dispatch data if required
+                if self.svd[i].computation_done:
+                    try:
+                        self.svd[i].computation_done = False
+                        # in the svd object
+                        # include the current step into the sent
+                        # data object
+    
+                        if self.svd[i].send_data:
+                            # Send data if required
+                            #print(self.svd[i].out)
+                            st = self.svd[i].step
+                            self.svd[i].out['step'] = st
+                            outgoing_dict[i] = self.svd[i].out
+                                
+                            #self.data_outgoing = jsonpickle.encode(outgoing_dict)
+                            #self.status_available = True
 
-            # GLOBAL AGGREGATION
-            if state == state_global_aggregation:
-                self.progress = "aggregate results..."
-                print("[COORDINATOR] Aggregate local results to a global result...", flush=True)
-                self.progress = 'Global aggregation...'
-                if len(self.data_incoming) == len(self.clients):
-                    print("[COORDINATOR] Received data of all participants.", flush=True)
-                    print("[COORDINATOR] Aggregate results...", flush=True)
-                    # Decode received data of each client
-                    data = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                    # Empty the incoming data (important for multiple iterations)
-                    self.data_incoming = []
-                    # Perform global aggregation
-                    self.global_result = global_aggregation(data)
-                    # Encode aggregated results for broadcasting
-                    data_to_broadcast = jsonpickle.encode(self.global_result)
-                    # Fill data_outgoing
-                    self.data_outgoing = data_to_broadcast
-                    # Set available to True such that the data will be broadcasted
-                    self.status_available = True
-                    state = state_finish
-                    print("[COORDINATOR] Global aggregation finished.", flush=True)
-                else:
-                    print(
-                        f"[COORDINATOR] Data of {str(len(self.clients) - len(self.data_incoming))} client(s) still "
-                        f"missing...)", flush=True)
+                            # move data to inbox, create key if not available
+                            # Master just moves its local model to the inbox
+                            # for easy aggregation
+                            # dont encode because data is decoded upn arrival
 
-            if state == state_finish:
-                self.progress = "finishing..."
-                print("[CLIENT] FINISHING", flush=True)
+                            if self.coordinator:
+                                if self.svd[i].step in self.svd[i].data_incoming.keys():
+                                    self.svd[i].data_incoming[st][self.id] = self.svd[i].out
+                                else:
+                                    self.svd[i].data_incoming[st] = {}
+                                    self.svd[i].data_incoming[st][self.id] = self.svd[i].out
+                        else:
+                            print('Move data to inbox')
+                            # Don't send data, just move to inbox.
+                            if self.svd[i].out is not None:
+                                st = self.svd[i].step
+                                self.svd[i].out['step'] = st
+                                if self.svd[i].step in self.svd[i].data_incoming.keys():
+                                    self.svd[i].data_incoming[st][self.id] = self.svd[i].out
+                                else:
+                                    self.svd[i].data_incoming[st] = {}
+                                    self.svd[i].data_incoming[st][self.id] = self.svd[i].out
+                        # reset the states
+                        
+                        self.svd[i].out = None
+                        self.svd[i].send_data = False
+                        # the app orchestration status
+                        #finally, increment the step
+                        self.svd[i].step = self.svd[i].next_state()
+                    except:
+                        print('Dispatch failed')
+            if outgoing_dict != {}:
+                self.data_outgoing = jsonpickle.encode(outgoing_dict)
+                self.iteration = self.iteration + 1
+                self.status_available = True
+                outgoing_dict = {}
 
-                # Write results
-                print(f"Final result: {self.global_result}")
-                f = open(f"{self.OUTPUT_DIR}/result.txt", "w")
-                f.write(str(self.global_result))
-                f.close()
 
-                # Wait some seconds to make sure all clients have written the results. This will be fixed soon.
-                if self.coordinator:
-                    time.sleep(5)
-
-                # Set finished flag to True, which ends the computation
-                self.status_finished = True
-                self.progress = "finished."
-                break
-
-            time.sleep(1)
+            time.sleep(0.1)
 
 
 logic = AppLogic()

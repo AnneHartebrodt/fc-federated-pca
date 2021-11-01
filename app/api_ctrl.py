@@ -28,6 +28,9 @@ def ctrl_status():
     return json.dumps({
         "available": logic.status_available,
         "finished": logic.status_finished,
+        "message": logic.message,
+        "state": logic.workflow_state,
+        "progress": logic.progress,
     })
 
 
@@ -40,5 +43,5 @@ def ctrl_data_out():
 @api_server.route("/data", method="POST")
 def ctrl_data_in():
     print(f"[API] POST /data", flush=True)
-    logic.handle_incoming(request.body)
+    logic.handle_incoming(request.body, request.query)
     return ""

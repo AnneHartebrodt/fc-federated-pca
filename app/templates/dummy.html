@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+{% block upload %}
+    <div id="container" style="width: 45%; height: 600px; float: left"></div>
+    <div style="width: 45%; height: 600px; float: right">
+        <h2>Global Parameters</h2>
+        <p><b># of PCs: </b> {{ pcs }}</p>
+    </div>
+    <div> Click on data points or use 'lasso select'. Click the rerun button to remove the outliers from the data and
+        restart the calculator.
+    </div>
+{% endblock %}
+{% block result %}
+    <input type="button" value="Calculate" id="calc" class="my-button">
+    <script>
+        function addSubmit() {
+            console.log('Clicked the button ajax 1')
+            console.log('selected')
+            var remove = {'selected': selected}
+            $.ajax({
+                url: "./rerun",
+                type: "POST",
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(remove),
+                dataType: "json",
+                success: window.location.replace('./loading')
+            });
+
+        }
+
+        $('.my-button').on('click', addSubmit);
+    </script>
+       <div class="chart" id="bargraph"></div>
+
+
+    <script>
+        myPlot = document.getElementById('bargraph')
+        var graphs = {{plot | safe}};
+        Plotly.plot('bargraph',graphs,{});
+        console.log(graphs)
+        console.log('Test')
+        var selected = [];
+        var color1 = '#FF0000';
+        var color1Light = '#0000FF';
+        var N = graphs[0]['x'].length
+        console.log(N)
+        var colors = [];
+        for(var i = 0; i < N; i++) colors.push(color1Light);
+        var preselected = []
+
+        myPlot.on('plotly_selected', function(eventData) {
+            //delete points from selected
+            selected = []
+          console.log(eventData.points)
+          eventData.points.forEach(function(pt) {
+                // Check if point in array
+                  if (preselected.includes(pt.pointNumber)){
+                      colors[pt.pointNumber] = color1Light;
+                      preselected.slice(preselected.indexOf(pt.pointNumber),1)
+                  }
+                  else {
+                      selected.push(pt.pointNumber)
+                      colors[pt.pointNumber] = color1;
+                  }
+          });
+            preselected.push(...selected)
+            console.log(preselected)
+            console.log(selected)
+            Plotly.restyle(myPlot, 'marker.color', [colors], [0]);
+});
+    </script>
+
+
+    <!--   <script>
+           //Check if rerun has been triggered by the coordinator
+           var intervalID = window.setInterval(enable_rerun, 10000);
+
+           function enable_rerun() {
+               $.getJSON("./rerun_client",
+                   function (data) {
+                       console.log(data.rerun)
+                       if (data.rerun) {
+                           document.getElementById("calc").disabled = false;
+                       }
+                   });
+           }
+       </script> -->
+{% endblock %}
