@@ -69,9 +69,13 @@ def create_configs_power(output_folder, batch=False, train_test=False, maxit=500
             counter = counter + 1
     return counter
 
-def create_configs_approx(output_folder, count, batch=True, train_test=True, maxit=500):
+def create_configs_single_round(output_folder, count, batch=True, train_test=True, maxit=500):
     config = make_default_config_file(batch=batch, algorithm='approximate_pca', train_test=train_test, maxit=maxit)
     write_config(config=config, basedir=output_folder, counter=str(count))
+    config = make_default_config_file(batch=batch, algorithm='full_covariance', train_test=train_test, maxit=maxit)
+    write_config(config=config, basedir=output_folder, counter=str(count+1))
+    config = make_default_config_file(batch=batch, algorithm='qr_pca', train_test=train_test, maxit=maxit)
+    write_config(config=config, basedir=output_folder, counter=str(count+2))
 
 
 if __name__ == '__main__':
@@ -86,7 +90,7 @@ if __name__ == '__main__':
     output_folder = op.join(basedir, args.o, 'config_files')
     os.makedirs(output_folder, exist_ok=True)
     count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=50, qr=['no_qr'])
-    create_configs_approx(output_folder,count, batch=args.b, train_test= args.t, maxit=50)
+    create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=50)
 
 
 

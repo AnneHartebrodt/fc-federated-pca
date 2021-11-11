@@ -9,7 +9,7 @@ import traceback
 from app.Steps import Step
 import numpy as np
 import copy
-from app.QR_params import QR
+from app.algo_params import QR, PCA_TYPE
 from shutil import copyfile
 from shutil import copyfile
 from app.SVD import SVD
@@ -25,12 +25,12 @@ class FCConfig:
         self.right_eigenvector_file = None
         self.projection_file = None
         self.k = 10
-        self.algorithm = 'power_iteration'
+        self.algorithm = PCA_TYPE.POWER_ITERATION
         self.federated_qr = False
         self.max_iterations = 500
         self.epsilon = 10e-9
 
-        self.init_method = 'approximate_pca'
+        self.init_method = PCA_TYPE.APPROXIMATE
 
         self.sep = '\t'
         self.has_rownames = False
@@ -123,7 +123,7 @@ class FCConfig:
 
                 try:
                     self.k = parameter_list['algorithm']['pcs']
-                    self.algorithm =  parameter_list['algorithm']['algorithm']
+                    self.algorithm =  PCA_TYPE.from_str(parameter_list['algorithm']['algorithm'])
                     self.federated_qr = QR.from_str(parameter_list['algorithm']['qr'])
                     self.max_iterations = parameter_list['algorithm']['max_iterations']
                     self.epsilon = float(parameter_list['algorithm']['epsilon'])

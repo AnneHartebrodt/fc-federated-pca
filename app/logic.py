@@ -7,7 +7,7 @@ jsonpickle_numpy.register_handlers()
 from app.Aggregator_FC_Federated_PCA import AggregatorFCFederatedPCA
 from app.Client_FC_FederatedPCA import ClientFCFederatedPCA
 from app.Steps import Step
-from app.QR_params import QR
+from app.algo_params import QR, PCA_TYPE
 from app.config import FCConfig
 
 
@@ -185,9 +185,17 @@ class AppLogic:
                 elif self.svd[i].step == Step.APPROXIMATE_LOCAL_PCA:
                     self.svd[i].init_approximate()
                     self.svd[i].init_approximate_pca()
-    
-                elif self.svd[i].step == Step.AGGREGATE_SUBSPACES:
-                    wait_for = Step.APPROXIMATE_LOCAL_PCA
+
+                elif self.svd[i].step == Step.COMPUTE_COVARIANCE:
+                    self.svd[i].compute_covariance()
+
+                # extremely similar code -> use the same flow step
+                elif self.svd[i].step == Step.AGGREGATE_SUBSPACES or self.svd[i].step == Step.AGGREGATE_COVARIANCES:
+                    if Step.APPROXIMATE_LOCAL_PCA in self.svd[i].data_incoming.keys():
+                        wait_for = Step.APPROXIMATE_LOCAL_PCA
+                    else:
+                        wait_for = Step.COMPUTE_COVARIANCE
+
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
@@ -346,9 +354,13 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:
-                    if self.svd[i].algorithm == 'approximate_pca':
-                        if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
+                    if self.svd[i].algorithm in [PCA_TYPE.APPROXIMATE,  PCA_TYPE.COVARIANCE, PCA_TYPE.QR]:
+                        if self.svd[i].algorithm == PCA_TYPE.APPROXIMATE:
                             wait_for = Step.AGGREGATE_SUBSPACES
+                        elif self.svd[i].algorithm == PCA_TYPE.COVARIANCE:
+                            wait_for = Step.AGGREGATE_COVARIANCE
+                        else:
+                            wait_for = Step.AGGREGATE_QR
                             print('CLIENT waiting for parameters ' + str(wait_for))
                         # Data (H matrix) needs to be updated from the server
                         if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:

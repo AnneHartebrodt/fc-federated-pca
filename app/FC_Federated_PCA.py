@@ -9,12 +9,13 @@ import traceback
 from app.Steps import Step
 import numpy as np
 import copy
-from app.QR_params import QR
+from app.algo_params import QR
 from shutil import copyfile
 from shutil import copyfile
 from app.SVD import SVD
 from app.params import INPUT_DIR, OUTPUT_DIR
 import pathlib as pl
+import scipy.linalg as la
 
 class FCFederatedPCA:
     def __init__(self):
@@ -99,6 +100,14 @@ class FCFederatedPCA:
         self.progress = 0.2
         self.pca = SVD.init_local_subspace(self.tabdata, k=self.k)
         self.k = self.pca.k
+        return True
+
+    def compute_covariance(self):
+        self.init_random()
+        self.progress = 0.2
+        self.covariance = np.dot(self.tabdata.scaled, self.tabdata.scaled.T)
+        self.k = self.pca.k
+        self.out = {'covariance_matrix': self.covariance}
         return True
 
 
@@ -244,4 +253,10 @@ class FCFederatedPCA:
                                   self.pca.G[:, self.current_vector])
         self.current_vector = self.current_vector + 1
         self.out = {'local_eigenvector_norm': self.local_eigenvector_norm}
+        return True
+
+    def compute_QR(self):
+        self.init_random()
+        q, self.r = la.qr(self.tabdata.scaled, mode='economic')
+        self.out = {'r': self.r}
         return True

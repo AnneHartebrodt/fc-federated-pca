@@ -21,6 +21,11 @@ class Step(Enum):
     APPROXIMATE_LOCAL_PCA = 'Approximating local subspaces'
     AGGREGATE_SUBSPACES = 'Aggregating approx. subspaces'
 
+    COMPUTE_COVARIANCE = 'Computing local covariance matrix'
+    AGGREGATE_COVARIANCE = 'Aggregating covariance matrix'
+
+    COMPUTE_QR = 'Computing local QR'
+    AGGREGATE_QR = 'Aggregating R matrices'
 
     COMPUTE_LOCAL_NORM = 'Computing local norm'
     COMPUTE_LOCAL_CONORM = 'Computing local co-norm'

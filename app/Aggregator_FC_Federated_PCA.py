@@ -4,7 +4,7 @@ from app.Steps import Step
 import scipy as sc
 import scipy.linalg as la
 from app.PCA.shared_functions import eigenvector_convergence_checker
-from app.QR_params import QR
+from app.algo_params import QR, PCA_TYPE
 import app.PCA.shared_functions as sh
 
 class AggregatorFCFederatedPCA(FCFederatedPCA):
@@ -15,12 +15,20 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
     def finalize_parameter_setup(self):
         self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,Step.READ_DATA]
-        if self.algorithm == 'approximate_pca':
+        if self.algorithm == PCA_TYPE.APPROXIMATE:
             self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
                                                  Step.AGGREGATE_SUBSPACES]
             self.queue_shutdown()
-        elif self.algorithm == 'power_iteration':
-            if self.init_method == 'approximate_pca':
+        elif self.algorithm == PCA_TYPE.COVARIANCE:
+            self.step_queue = self.step_queue + [Step.COMPUTE_COVARIANCE,
+                                                 Step.AGGREGATE_COVARIANCES]
+            self.queue_shutdown()
+        elif self.algorithm == PCA_TYPE.QR_PCA:
+            self.step_queue = self.step_queue + [Step.COMPUTE_QR,
+                                                 Step.AGGREGATE_COVARIANCES]
+            self.queue_shutdown()
+        elif self.algorithm == PCA_TYPE.POWER_ITERATION:
+            if self.init_method == PCA_TYPE.APPROXIMATE:
                 self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
                                                      Step.AGGREGATE_SUBSPACES]
             else:
@@ -180,10 +188,13 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         h_matrices = []
         for m in incoming:
             h_matrices.append(m['local_h'])
-
-        h_matrices = np.concatenate(h_matrices, axis = 1)
+        if self.algorithm == PCA_TYPE.COVARIANCE:
+            # element wise addition
+            h_matrices = np.add(h_matrices, axis=0)
+        else: #self.algorithm == PCA_TYPE.APPROXIMATE:
+            h_matrices = np.concatenate(h_matrices, axis = 1)
         H, S, G , k = sh.svd_sub(h_matrices, self.k)
-        if self.algorithm == 'approximate_pca':
+        if self.algorithm == PCA_TYPE.APPROXIMATE or self.algorithm == PCA_TYPE.COVARIANCE:
             print('Converged')
             out = {'h_global': H, 'converged': True}
         else:
@@ -194,4 +205,11 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.send_data = True
         self.computation_done = True
         return True
+
+    def compute_covariance(self):
+        super(AggregatorFCFederatedPCA, self).compute_covariance()
+        self.computation_done = True
+        self.send_data = False
+        return True
+
 
