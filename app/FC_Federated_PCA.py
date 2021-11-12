@@ -51,6 +51,7 @@ class FCFederatedPCA:
         return self.state
 
     def copy_configuration(self, config, directory, train=''):
+        print('Copy configuration')
         self.config_available = config.config_available
         self.batch = config.batch
         self.directories = config.directories
@@ -255,8 +256,8 @@ class FCFederatedPCA:
         self.out = {'local_eigenvector_norm': self.local_eigenvector_norm}
         return True
 
-    def compute_QR(self):
+    def compute_qr(self):
         self.init_random()
-        q, self.r = la.qr(self.tabdata.scaled, mode='economic')
+        q, self.r = la.qr(self.tabdata.scaled.T, mode='economic')
         self.out = {'r': self.r}
         return True

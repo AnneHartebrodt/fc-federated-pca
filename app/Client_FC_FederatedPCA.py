@@ -6,7 +6,7 @@ import pandas as pd
 import traceback
 from app.Steps import Step
 import copy
-from app.algo_params import QR
+from app.algo_params import QR, PCA_TYPE
 
 class ClientFCFederatedPCA(FCFederatedPCA):
     def __init__(self):
@@ -19,6 +19,13 @@ class ClientFCFederatedPCA(FCFederatedPCA):
                            Step.READ_DATA]
         if self.algorithm == PCA_TYPE.APPROXIMATE:
             self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA]
+            self.queue_shutdown()
+
+        elif self.algorithm == PCA_TYPE.COVARIANCE:
+            self.step_queue = self.step_queue + [Step.COMPUTE_COVARIANCE]
+            self.queue_shutdown()
+        elif self.algorithm == PCA_TYPE.QR_PCA:
+            self.step_queue = self.step_queue + [Step.COMPUTE_QR]
             self.queue_shutdown()
 
         if self.algorithm == PCA_TYPE.POWER_ITERATION:
@@ -114,6 +121,12 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
     def compute_covariance(self):
         super(ClientFCFederatedPCA, self).compute_covariance()
+        self.computation_done = True
+        self.send_data = True
+        return True
+
+    def compute_qr(self):
+        super(ClientFCFederatedPCA,self).compute_qr()
         self.computation_done = True
         self.send_data = True
         return True

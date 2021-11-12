@@ -123,7 +123,7 @@ class FCConfig:
 
                 try:
                     self.k = parameter_list['algorithm']['pcs']
-                    self.algorithm =  PCA_TYPE.from_str(parameter_list['algorithm']['algorithm'])
+                    self.algorithm = PCA_TYPE.from_str(parameter_list['algorithm']['algorithm'])
                     self.federated_qr = QR.from_str(parameter_list['algorithm']['qr'])
                     self.max_iterations = parameter_list['algorithm']['max_iterations']
                     self.epsilon = float(parameter_list['algorithm']['epsilon'])

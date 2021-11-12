@@ -108,12 +108,15 @@ class AppLogic:
         self.thread = threading.Thread(target=self.app_flow)
         self.thread.start()
 
-    def handle_incoming(self, data, query):
+    def handle_incoming(self, data, query, content_length):
         # This method is called when new data arrives
         print("Process incoming data....", flush=True)
         client = query.getunicode('client')
+
         print('client: '+str(client))
         incoming = data.read()
+        print('Recieved data length:')
+        print(content_length)
         # Here we use a dictionary because some information is client
         # specific
         incoming = jsonpickle.decode(incoming)
@@ -189,8 +192,23 @@ class AppLogic:
                 elif self.svd[i].step == Step.COMPUTE_COVARIANCE:
                     self.svd[i].compute_covariance()
 
+                elif self.svd[i].step == Step.COMPUTE_QR:
+                    self.svd[i].compute_qr()
+
+                elif self.svd[i].step == Step.AGGREGATE_QR:
+                    wait_for = Step.COMPUTE_QR
+                    print('CLIENT waiting for parameters ' + str(wait_for))
+                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(
+                            self.clients):
+                        print("[COORDINATOR] Received data of all participants.", flush=True)
+                        print("[COORDINATOR] Aggregate results...", flush=True)
+                        # Decode received data of each client
+                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                        # Empty the incoming data (important for multiple iterations)
+                        self.svd[i].aggregate_qr(incoming)
+
                 # extremely similar code -> use the same flow step
-                elif self.svd[i].step == Step.AGGREGATE_SUBSPACES or self.svd[i].step == Step.AGGREGATE_COVARIANCES:
+                elif self.svd[i].step == Step.AGGREGATE_SUBSPACES or self.svd[i].step == Step.AGGREGATE_COVARIANCE:
                     if Step.APPROXIMATE_LOCAL_PCA in self.svd[i].data_incoming.keys():
                         wait_for = Step.APPROXIMATE_LOCAL_PCA
                     else:
@@ -354,7 +372,7 @@ class AppLogic:
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:
-                    if self.svd[i].algorithm in [PCA_TYPE.APPROXIMATE,  PCA_TYPE.COVARIANCE, PCA_TYPE.QR]:
+                    if self.svd[i].algorithm in [PCA_TYPE.APPROXIMATE,  PCA_TYPE.COVARIANCE, PCA_TYPE.QR_PCA]:
                         if self.svd[i].algorithm == PCA_TYPE.APPROXIMATE:
                             wait_for = Step.AGGREGATE_SUBSPACES
                         elif self.svd[i].algorithm == PCA_TYPE.COVARIANCE:

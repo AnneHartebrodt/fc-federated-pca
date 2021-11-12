@@ -21,11 +21,11 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
             self.queue_shutdown()
         elif self.algorithm == PCA_TYPE.COVARIANCE:
             self.step_queue = self.step_queue + [Step.COMPUTE_COVARIANCE,
-                                                 Step.AGGREGATE_COVARIANCES]
+                                                 Step.AGGREGATE_COVARIANCE]
             self.queue_shutdown()
         elif self.algorithm == PCA_TYPE.QR_PCA:
             self.step_queue = self.step_queue + [Step.COMPUTE_QR,
-                                                 Step.AGGREGATE_COVARIANCES]
+                                                 Step.AGGREGATE_QR]
             self.queue_shutdown()
         elif self.algorithm == PCA_TYPE.POWER_ITERATION:
             if self.init_method == PCA_TYPE.APPROXIMATE:
@@ -186,12 +186,15 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
     def aggregate_local_subspaces(self, incoming):
         h_matrices = []
-        for m in incoming:
-            h_matrices.append(m['local_h'])
+
         if self.algorithm == PCA_TYPE.COVARIANCE:
+            for m in incoming:
+                h_matrices.append(m['covariance_matrix'])
             # element wise addition
-            h_matrices = np.add(h_matrices, axis=0)
+            h_matrices = np.nansum(h_matrices, axis=0)
         else: #self.algorithm == PCA_TYPE.APPROXIMATE:
+            for m in incoming:
+                h_matrices.append(m['local_h'])
             h_matrices = np.concatenate(h_matrices, axis = 1)
         H, S, G , k = sh.svd_sub(h_matrices, self.k)
         if self.algorithm == PCA_TYPE.APPROXIMATE or self.algorithm == PCA_TYPE.COVARIANCE:
@@ -211,5 +214,24 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.computation_done = True
         self.send_data = False
         return True
+
+    def compute_qr(self):
+        super(AggregatorFCFederatedPCA, self).compute_qr()
+        self.computation_done = True
+        self.send_data = False
+        return True
+
+    def aggregate_qr(self, incoming):
+        r_matrices = []
+        for m in incoming:
+            r_matrices.append(m['r'])
+
+        r_matrices = np.concatenate(r_matrices, axis=0)
+        q,r  = la.qr(r_matrices, mode='economic')
+        u, s,v, nd  = sh.svd_sub(r, ndims=self.k)
+        self.out = {'h_global': v}
+        self.computation_done = True
+        self.send_data = True
+
 
 
