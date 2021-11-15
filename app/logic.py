@@ -9,7 +9,10 @@ from app.Client_FC_FederatedPCA import ClientFCFederatedPCA
 from app.Steps import Step
 from app.algo_params import QR, PCA_TYPE
 from app.config import FCConfig
-
+import os.path as op
+from app.params import OUTPUT_DIR
+import numpy as np
+import pandas as pd
 
 class AppLogic:
 
@@ -54,6 +57,8 @@ class AppLogic:
         # === FCFederatedPCA instance ===
         self.svd = None
 
+        self.communication_logger = []
+        self.start_time = 0
 
     def handle_setup(self, client_id, master, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
@@ -62,7 +67,7 @@ class AppLogic:
         self.clients = clients
         print(f"Received setup: {self.id} {self.coordinator} {self.clients}", flush=True)
         self.configure()
-
+        self.start_time = time.monotonic()
         self.svd = {}
         # batch config loops over the files
         if self.config.batch:
@@ -116,10 +121,11 @@ class AppLogic:
         print('client: '+str(client))
         incoming = data.read()
         print('Recieved data length:')
-        print(content_length)
+        self.communication_logger.append(content_length)
         # Here we use a dictionary because some information is client
         # specific
         incoming = jsonpickle.decode(incoming)
+        print(incoming)
         for i in incoming.keys():
             j = int(i)
             step = incoming[i]['step']
@@ -140,6 +146,21 @@ class AppLogic:
             self.config.parse_configuration()
             print("[CLIENT] finished parsing parameter file.", flush=True)
 
+    def shutdown(self):
+        log_file = op.join(OUTPUT_DIR, 'logs.txt')
+        end = time.monotonic()
+        with open(log_file, 'w') as handle:
+            handle.write('start\t'+str(self.start_time)+'\n')
+            handle.write('end\t' + str(end)+'\n')
+            handle.write('elapsed\t' + str(end-self.start_time)+'\n')
+            handle.write('iterations\t' + str(self.iteration)+'\n')
+            handle.write('packages sent\t' + str(len(self.communication_logger))+'\n')
+            handle.write('average package size\t' + str(np.mean(self.communication_logger))+'\n')
+            handle.write('max package size\t' + str(np.max(self.communication_logger))+'\n')
+            handle.write('min package size\t' + str(np.min(self.communication_logger))+'\n')
+        pd.DataFrame(self.communication_logger).to_csv(op.join(OUTPUT_DIR, 'communication.txt'), header=False, index=False, sep='\t')
+
+
 
 
 
@@ -154,6 +175,7 @@ class AppLogic:
 
     def app_flow(self):
         # This method contains a state machine for the participant and coordinator instance
+        outgoing_dict = {}
         while True:
             self.progress = self.svd[0].progress
             self.message = self.svd[0].step.value
@@ -256,7 +278,7 @@ class AppLogic:
                 elif self.svd[i].step == Step.AGGREGATE_H:
                     if Step.COMPUTE_H_LOCAL in self.svd[i].data_incoming.keys():
                         wait_for = Step.COMPUTE_H_LOCAL
-                    elif Step.UPDATE_H in self.svd[i].data_incoming.keys() :
+                    elif Step.UPDATE_H in self.svd[i].data_incoming.keys():
                         wait_for = Step.UPDATE_H
                     else:
                         wait_for = Step.INIT_POWER_ITERATION
@@ -403,28 +425,29 @@ class AppLogic:
                         print(self.svd[i].data_incoming)
                         if (wait_for in self.svd[i].data_incoming.keys() and \
                                 len(self.svd[i].data_incoming[wait_for]) >= len(self.clients)-1) or len(self.clients)==1:
+                            self.shutdown()
                             self.svd[i].progress = 1.0
-                            #self.status_finished = True
                             self.finish_count = self.finish_count + 1
                             self.svd[i].step = Step.FINISHED
                     else:
+                        self.shutdown()
                         self.svd[i].out = {'finished': True, 'step': Step.FINALIZE}
                         self.svd[i].send_data = True
                         self.svd[i].computation_done = True
                         self.svd[i].progress = 1.0
                         self.svd[i].step_queue = self.svd[i].step_queue + [Step.FINISHED]
 
-
                 elif self.svd[i].step == Step.FINISHED:
                     # Wait for all clients to be finished.
                     if self.finish_count == len(self.svd):
+                        print('SETTING TO FINISHED')
+                        time.sleep(3)
                         self.status_finished = True
                     print('App run completed')
-    
                 else:
                     print("[CLIENT] NO SUCH STATE", flush=True)
 
-            outgoing_dict = {}
+
             for i in range(len(self.svd)):
                 # Dispatch data if required
                 if self.svd[i].computation_done:
@@ -450,6 +473,7 @@ class AppLogic:
                             # dont encode because data is decoded upn arrival
 
                             if self.coordinator:
+                                #todo CORRECT THIS
                                 if self.svd[i].step in self.svd[i].data_incoming.keys():
                                     self.svd[i].data_incoming[st][self.id] = self.svd[i].out
                                 else:
@@ -476,10 +500,13 @@ class AppLogic:
                     except:
                         print('Dispatch failed')
             if outgoing_dict != {}:
-                self.data_outgoing = jsonpickle.encode(outgoing_dict)
-                self.iteration = self.iteration + 1
-                self.status_available = True
-                outgoing_dict = {}
+                # Dispatch and delete if object empty. Otherwise wait
+                # until dispatched to add new object
+                if self.data_outgoing == None:
+                    self.data_outgoing = jsonpickle.encode(outgoing_dict)
+                    self.iteration = self.iteration + 1
+                    self.status_available = True
+                    outgoing_dict = {}
 
 
             time.sleep(0.1)

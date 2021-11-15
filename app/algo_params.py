@@ -20,13 +20,13 @@ class PCA_TYPE(Enum):
 
     @staticmethod
     def from_str(label):
-        if label == PCA_TYPE.APPROXIMATE:
+        if label == 'approximate_pca':
             return PCA_TYPE.APPROXIMATE
         elif label == 'full_covariance':
             return PCA_TYPE.COVARIANCE
         elif label == 'qr_pca':
             return PCA_TYPE.QR_PCA
-        elif label == PCA_TYPE.POWER_ITERATION:
+        elif label == 'power_iteration':
             return PCA_TYPE.POWER_ITERATION
         else:
             return PCA_TYPE.APPROXIMATE

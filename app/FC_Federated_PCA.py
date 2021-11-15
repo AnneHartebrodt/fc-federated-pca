@@ -64,6 +64,10 @@ class FCFederatedPCA:
         self.algorithm = config.algorithm
         self.federated_qr = config.federated_qr
         self.max_iterations = config.max_iterations
+
+
+
+
         self.epsilon = config.epsilon
         self.init_method = config.init_method
 

@@ -31,7 +31,7 @@ def make_default_config_file(algorithm = 'power_iteration',
                    'algorithm': algorithm,
                    'max_iterations': maxit,
                    'qr': qr,
-                   'epsilon': 1e-9,
+                   'epsilon': 1e-12,
                    'init': init
                    },
               'settings':
@@ -89,8 +89,8 @@ if __name__ == '__main__':
 
     output_folder = op.join(basedir, args.o, 'config_files')
     os.makedirs(output_folder, exist_ok=True)
-    count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=50, qr=['no_qr'])
-    create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=50)
+    count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=1000, qr=['no_qr'])
+    create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=1000)
 
 
 

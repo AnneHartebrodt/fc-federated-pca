@@ -45,10 +45,10 @@ def create_result(left_angles, right_angles,  config, run_id='NA', config_path='
         names.append(key)
         l.append(config[key])
     for a in range(len(left_angles)):
-        names.append('SV (l)'+str(a+1))
+        names.append('LSV'+str(a+1))
         l.append(left_angles[a])
     for a in range(len(right_angles)):
-        names.append('SV (r)'+str(a+1))
+        names.append('RSV'+str(a+1))
         l.append(right_angles[a])
     data = pd.DataFrame(l).T
     data.columns = names

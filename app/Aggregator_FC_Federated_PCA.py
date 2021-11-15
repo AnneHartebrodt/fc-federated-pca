@@ -89,7 +89,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
     def update_h(self, incoming):
         self.update_progess()
         # First, update the local G estimate
-        self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
+        self.pca.H = incoming['h_global']
+        self.pca.G = np.dot(self.tabdata.scaled.T, self.pca.H)
         self.pca.S = np.linalg.norm(self.pca.G, axis=1)
 
         # Then check for convergence.
@@ -128,6 +129,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         print(self.epsilon)
         print(self.pca.H.shape)
         print(self.pca.previous_h.shape)
+        print(self.pca.H)
+        print(self.pca.previous_h)
         converged, deltas = eigenvector_convergence_checker(global_HI_matrix, self.pca.previous_h, tolerance=self.epsilon)
         print(converged)
         if self.iteration_counter == self.max_iterations or converged:
