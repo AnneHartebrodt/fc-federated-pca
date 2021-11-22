@@ -1,7 +1,11 @@
 test_report=/home/anne/Documents/featurecloud/apps/tests
 
-basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
-pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+#clidir=/home/anne/Documents/featurecloud/test-environment/cli
+#pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+#basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
+basedir=$1
+clidir=$2
+pydir=$3
 
 sudo mkdir -p $test_report
 

@@ -1,13 +1,17 @@
 mydir=$(pwd)
-basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
-#current_test_dir_suffix=app_test/batch_cross
+
+basedir=$1
+clidir=$2
+pydir=$3
+#clidir=/home/anne/Documents/featurecloud/test-environment/cli
+#pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+#basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
+#
+#
+# current_test_dir_suffix=app_test/batch_cross
 
 
 controller_data_test_result=$basedir/tests
-
-clidir=/home/anne/Documents/featurecloud/test-environment/cli
-pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
-
 
 count=1
 outdirs=()
