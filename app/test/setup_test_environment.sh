@@ -5,6 +5,9 @@
 basedir=$1
 clidir=$2
 pydir=$3
+echo $pydir
+echo $basedir
+echo $clidir
 
 outputfolder=$basedir/app_test
 mkdir -p $outputfolder

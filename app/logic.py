@@ -27,7 +27,7 @@ class AppLogic:
         #
         self.use_smpc = False
         self.status_smpc = False
-        self.exponent = 35
+        self.exponent = 15
         self.shards = 1
         # Will stop execution when True
         self.status_finished = False
