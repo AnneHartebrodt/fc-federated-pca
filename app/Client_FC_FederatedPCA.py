@@ -36,7 +36,6 @@ class ClientFCFederatedPCA(FCFederatedPCA):
                 self.step_queue = self.step_queue + [Step.INIT_POWER_ITERATION]
 
             if self.federated_qr == QR.NO_QR:
-
                 self.step_queue = self.step_queue + [Step.UPDATE_H]
             else:
                 self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
@@ -91,6 +90,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
         if self.federated_qr == QR.FEDERATED_QR:
             self.queue_qr()
+
         if self.converged:
             self.queue_shutdown()
         else:

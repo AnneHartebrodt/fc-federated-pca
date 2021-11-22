@@ -19,8 +19,8 @@ class COParams(Enum):
             return COParams.FINISHED
         elif string_value == 'Covariance matrix':
             return COParams.COVARIANCE_MATRIX
-        elif string_value == 'Global Cornorms':
-            return COParams.GLOBAL_CORNORMS
+        elif string_value == 'Global Conorms':
+            return COParams.GLOBAL_CONORMS
         elif string_value == 'Local Conorms':
             return COParams.LOCAL_CONORMS
         elif string_value == 'Global Eigenvector norm':
@@ -40,10 +40,14 @@ class COParams(Enum):
 
     @staticmethod
     def to_step(string_value):
-        if string_value == 'H local':
+        if string_value == COParams.H_LOCAL.n:
             return Step.UPDATE_H
-        elif string_value == 'Covariance matrix':
+        elif string_value == COParams.COVARIANCE_MATRIX.n:
             return Step.COMPUTE_COVARIANCE
+        elif string_value == COParams.LOCAL_EIGENVECTOR_NORM.n:
+            return Step.COMPUTE_LOCAL_NORM
+        elif string_value == COParams.LOCAL_CONORMS.n:
+            return Step.COMPUTE_LOCAL_CONORM
         else:
             return None
 
@@ -54,7 +58,7 @@ class COParams(Enum):
     STEP = 'Step', False
     FINISHED = 'finished', False
     COVARIANCE_MATRIX = 'Covariance matrix', True
-    GLOBAL_CORNORMS = 'Global Cornorms', False
+    GLOBAL_CONORMS = 'Global Conorms', False
     LOCAL_CONORMS = 'Local Conorms', True
     GLOBAL_EIGENVECTOR_NORM = 'Global Eigenvector norm', False
     LOCAL_EIGENVECTOR_NORM = 'Local Eigenvector norm', True

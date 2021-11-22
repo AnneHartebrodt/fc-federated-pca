@@ -91,8 +91,8 @@ if __name__ == '__main__':
 
     output_folder = op.join(basedir, args.o, 'config_files')
     os.makedirs(output_folder, exist_ok=True)
-    count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=5, qr=['no_qr', 'federated_qr'], use_smpc=[True, False])
-    create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=5,use_smpc=[True, False])
+    count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=1000, qr=['no_qr'], use_smpc=[True, False])
+    create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=1000,use_smpc=[True, False])
 
 
 

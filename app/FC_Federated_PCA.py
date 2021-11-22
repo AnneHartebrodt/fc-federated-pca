@@ -260,7 +260,9 @@ class FCFederatedPCA:
         self.local_vector_conorms = vector_conorms
         if self.current_vector == self.k:
             self.orthonormalisation_done = True
-        self.out = {COParams.LOCAL_CONORMS.n: self.local_vector_conorms}
+        local_conorms = [float(a) for a in self.local_vector_conorms]
+        self.out = {COParams.LOCAL_CONORMS.n: local_conorms}
+        #self.out = {COParams.LOCAL_CONORMS.n: 10}
         return True
 
     def compute_local_eigenvector_norm(self):
@@ -270,7 +272,8 @@ class FCFederatedPCA:
         self.local_eigenvector_norm = np.dot(self.pca.G[:, self.current_vector],
                                   self.pca.G[:, self.current_vector])
         self.current_vector = self.current_vector + 1
-        self.out = {COParams.LOCAL_EIGENVECTOR_NORM.n: self.local_eigenvector_norm}
+
+        self.out = {COParams.LOCAL_EIGENVECTOR_NORM.n: float(self.local_eigenvector_norm)}
         return True
 
     def compute_qr(self):

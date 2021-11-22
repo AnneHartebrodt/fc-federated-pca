@@ -148,7 +148,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
             self.converged = True
             print('CONVERGED')
         else:
-            self.step_queue = self.step_queue + [Step.UPDATE_H, Step.AGGREGATE_H]
+            if self.federated_qr == QR.NO_QR:
+                self.step_queue = self.step_queue + [Step.UPDATE_H, Step.AGGREGATE_H]
         out = {COParams.H_GLOBAL.n: global_HI_matrix, COParams.CONVERGED.n: self.converged}
         self.out = out
         self.send_data = True
@@ -172,9 +173,12 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         self.send_data = self.use_smpc
 
     def aggregate_eigenvector_norms(self, incoming):
-        eigenvector_norm = 0
-        for v in incoming:
-            eigenvector_norm = eigenvector_norm + v[COParams.LOCAL_EIGENVECTOR_NORM.n]
+        if self.use_smpc:
+            eigenvector_norm = incoming[0][COParams.LOCAL_EIGENVECTOR_NORM.n]
+        else:
+            eigenvector_norm = 0
+            for v in incoming:
+                eigenvector_norm = eigenvector_norm + v[COParams.LOCAL_EIGENVECTOR_NORM.n]
 
         eigenvector_norm = np.sqrt(eigenvector_norm)
         # increment the vector index after sending back the norms
@@ -187,9 +191,13 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
     def aggregate_conorms(self, incoming):
         print('aggregating co norms')
-        conorms = np.zeros(len(incoming[0][COParams.LOCAL_CONORMS.n]))
-        for n in incoming:
-            conorms = np.sum([conorms, n[COParams.LOCAL_CONORMS.n]], axis=0)
+        print(incoming)
+        if self.use_smpc:
+            conorms = np.array(incoming[0][COParams.LOCAL_CONORMS.n])
+        else:
+            conorms = np.zeros(len(incoming[0][COParams.LOCAL_CONORMS.n]))
+            for n in incoming:
+                conorms = np.sum([conorms, n[COParams.LOCAL_CONORMS.n]], axis=0)
         self.out = {COParams.GLOBAL_CONORMS.n: conorms}
         self.computation_done = True
         self.send_data = True

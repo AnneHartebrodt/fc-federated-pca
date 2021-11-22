@@ -392,7 +392,9 @@ class AppLogic:
     
                 elif self.svd[i].step == Step.AGGREGATE_NORM:
                     wait_for = Step.COMPUTE_LOCAL_NORM
-                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
+                    if wait_for in self.svd[i].data_incoming.keys() and \
+                            (len(self.svd[i].data_incoming[wait_for]) == len(self.clients) or
+                             len(self.svd[i].data_incoming[wait_for]) == 1 and self.use_smpc):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
                         print("[COORDINATOR] Aggregate results...", flush=True)
                         # Decode received data of each client
@@ -404,16 +406,16 @@ class AppLogic:
     
                 elif self.svd[i].step == Step.AGGREGATE_CONORM:
                     wait_for = Step.COMPUTE_LOCAL_CONORM
-                    if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
+                    if wait_for in self.svd[i].data_incoming.keys() and \
+                            (len(self.svd[i].data_incoming[wait_for]) == len(self.clients) or
+                             len(self.svd[i].data_incoming[wait_for]) == 1 and self.use_smpc):
                         print("[COORDINATOR] Received data of all participants.", flush=True)
                         print("[COORDINATOR] Aggregate results...", flush=True)
                         incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
                         # Empty the incoming data (important for multiple iterations)
                         self.svd[i].data_incoming.pop(wait_for, None)
-                        try:
-                            self.svd[i].aggregate_conorms(incoming)
-                        except:
-                            print('Co-norm aggregation failed')
+                        self.svd[i].aggregate_conorms(incoming)
+
     
                 elif self.svd[i].step == Step.NORMALISE_G:
                     wait_for = Step.AGGREGATE_NORM
@@ -518,6 +520,7 @@ class AppLogic:
                             # Split the params
                             for key in self.svd[i].out.keys():
                                 if key is not COParams.STEP.n:
+                                    print(key)
                                     if COParams.from_str(key).smpc:
                                         if i not in smpc_outgoing_dict.keys():
                                             smpc_outgoing_dict[i] = {}
