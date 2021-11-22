@@ -37,7 +37,7 @@ do
   # generate a random string to use as the output directory
   outputdir=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')
   outdirs[${#outdirs[@]}]=$outputdir
-  sudo mkdir $controller_data_test_result/$outputdir
+  #sudo mkdir $controller_data_test_result/$outputdir
 
 
   #echo $dirs
