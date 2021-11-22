@@ -6,6 +6,7 @@ import scipy.linalg as la
 from app.PCA.shared_functions import eigenvector_convergence_checker
 from app.algo_params import QR, PCA_TYPE
 import app.PCA.shared_functions as sh
+from app.COParams import COParams
 
 class AggregatorFCFederatedPCA(FCFederatedPCA):
     def __init__(self):
@@ -16,8 +17,11 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
     def finalize_parameter_setup(self):
         self.step_queue = self.step_queue + [Step.WAIT_FOR_PARAMS,Step.READ_DATA]
         if self.algorithm == PCA_TYPE.APPROXIMATE:
-            self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA,
-                                                 Step.AGGREGATE_SUBSPACES]
+            self.step_queue = self.step_queue + [Step.APPROXIMATE_LOCAL_PCA]
+            if self.use_smpc:
+                self.step_queue = self.step_queue + [Step.AGGREGATE_COVARIANCE]
+            else:
+                self.step_queue = self.step_queue + [Step.AGGREGATE_SUBSPACES]
             self.queue_shutdown()
         elif self.algorithm == PCA_TYPE.COVARIANCE:
             self.step_queue = self.step_queue + [Step.COMPUTE_COVARIANCE,
@@ -35,15 +39,17 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
                 self.step_queue = self.step_queue + [Step.INIT_POWER_ITERATION, Step.AGGREGATE_H]
 
             if self.federated_qr == QR.NO_QR:
-                self.step_queue = self.step_queue + [Step.UPDATE_H]
+                print('pass')
+                #self.step_queue = self.step_queue + [Step.UPDATE_H, Step.AGGREGATE_H]
             else:
                 self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
         else:
             self.step_queue = [Step.FINALIZE]
 
+        print('[API] [COORDINATOR] /setup config done!')
         # No user interaction required, set available to true
         # master still sends configuration to all clients.
-        self.out = {'pcs': self.k}
+        self.out = {COParams.PCS.n: self.k}
         print(self.step_queue)
         self.send_data = True
         self.computation_done = True
@@ -55,7 +61,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         # of centralised PCA
         super(AggregatorFCFederatedPCA, self).compute_h_local_g()
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
         return True
 
     def queue_qr(self):
@@ -69,8 +76,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
                                                  Step.NORMALISE_G]
 
     def compute_g(self, incoming):
-        self.pca.H = incoming['h_global']
-        self.converged = incoming['converged']
+        self.pca.H = incoming[COParams.H_GLOBAL.n]
+        self.converged = incoming[COParams.CONVERGED.n]
         self.pca.G = np.dot(self.tabdata.scaled.T, self.pca.H)
         if self.federated_qr == QR.FEDERATED_QR:
             self.queue_qr()
@@ -89,23 +96,29 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
     def update_h(self, incoming):
         self.update_progess()
         # First, update the local G estimate
-        self.pca.H = incoming['h_global']
+        self.pca.H = incoming[COParams.H_GLOBAL.n]
         self.pca.G = np.dot(self.tabdata.scaled.T, self.pca.H)
         self.pca.S = np.linalg.norm(self.pca.G, axis=1)
 
         # Then check for convergence.
-        self.converged = incoming['converged']
+        self.converged = incoming[COParams.CONVERGED.n]
         self.pca.previous_h = self.pca.H
-        if self.converged:
-            self.pca.H = incoming['h_global']
-            self.queue_shutdown()
-        else:
-            self.step_queue = self.step_queue + [Step.AGGREGATE_H, Step.UPDATE_H]
-            self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+        # if self.converged:
+        #     self.pca.H = incoming[COParams.H_GLOBAL.n]
+        #     self.queue_shutdown()
+        # else:
+        #     # changed step queing
+        #     self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
+        # # If convergence not reached, update H and go on
+        #     self.out = {COParams.H_LOCAL.n: self.pca.H}
+
+
+        self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         # If convergence not reached, update H and go on
-            self.out = {'local_h': self.pca.H}
+        self.out = {COParams.H_LOCAL.n: self.pca.H}
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
         return True
 
     def aggregate_h(self, incoming):
@@ -117,26 +130,26 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         '''
 
         print("Adding up H matrices from clients ...")
-        global_HI_matrix = np.zeros(self.pca.H.shape)
-        for m in incoming:
-            global_HI_matrix += m['local_h']
-        print('H matrices added up')
+        if self.use_smpc:
+            global_HI_matrix = np.array(incoming[0][COParams.H_LOCAL.n])
+        else:
+            global_HI_matrix = np.zeros(self.pca.H.shape)
+            for m in incoming:
+                global_HI_matrix += m[COParams.H_LOCAL.n]
+            print('H matrices added up')
         global_HI_matrix, R = la.qr(global_HI_matrix, mode='economic')
         self.iteration_counter = self.iteration_counter + 1
         print(self.iteration_counter)
         # The previous H matrix is stored in the global variable
-        print('orthonormalised')
-        print(self.epsilon)
-        print(self.pca.H.shape)
-        print(self.pca.previous_h.shape)
-        print(self.pca.H)
-        print(self.pca.previous_h)
+        print('Orthonormalised')
         converged, deltas = eigenvector_convergence_checker(global_HI_matrix, self.pca.previous_h, tolerance=self.epsilon)
-        print(converged)
         if self.iteration_counter == self.max_iterations or converged:
+            self.queue_shutdown()
             self.converged = True
             print('CONVERGED')
-        out = {'h_global': global_HI_matrix, 'converged': self.converged}
+        else:
+            self.step_queue = self.step_queue + [Step.UPDATE_H, Step.AGGREGATE_H]
+        out = {COParams.H_GLOBAL.n: global_HI_matrix, COParams.CONVERGED.n: self.converged}
         self.out = out
         self.send_data = True
         self.computation_done = True
@@ -144,69 +157,81 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
     def init_power_iteration(self):
         super(AggregatorFCFederatedPCA, self).init_power_iteration()
+        self.iteration_counter = self.iteration_counter + 1
+
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
 
     def init_approximate_pca(self):
         super(AggregatorFCFederatedPCA, self).init_approximate_pca()
+        self.iteration_counter = self.iteration_counter + 1
+
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
 
     def aggregate_eigenvector_norms(self, incoming):
         eigenvector_norm = 0
         for v in incoming:
-            eigenvector_norm = eigenvector_norm + v['local_eigenvector_norm']
+            eigenvector_norm = eigenvector_norm + v[COParams.LOCAL_EIGENVECTOR_NORM.n]
 
         eigenvector_norm = np.sqrt(eigenvector_norm)
         # increment the vector index after sending back the norms
         if self.current_vector == self.k:
             self.orthonormalisation_done = True
-        self.out = {'global_eigenvector_norm': eigenvector_norm, 'orthonormalisation_done': self.orthonormalisation_done}
+        self.out = {COParams.GLOBAL_EIGENVECTOR_NORM.n: eigenvector_norm, COParams.ORTHONORMALISATION_DONE.n: self.orthonormalisation_done}
         self.computation_done = True
         self.send_data = True
         return True
 
     def aggregate_conorms(self, incoming):
         print('aggregating co norms')
-        conorms = np.zeros(len(incoming[0]['local_conorms']))
+        conorms = np.zeros(len(incoming[0][COParams.LOCAL_CONORMS.n]))
         for n in incoming:
-            conorms = np.sum([conorms, n['local_conorms']], axis=0)
-        self.out = {'global_conorms': conorms}
+            conorms = np.sum([conorms, n[COParams.LOCAL_CONORMS.n]], axis=0)
+        self.out = {COParams.GLOBAL_CONORMS.n: conorms}
         self.computation_done = True
         self.send_data = True
 
     def compute_local_eigenvector_norm(self):
         super(AggregatorFCFederatedPCA, self).compute_local_eigenvector_norm()        
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
         return True
 
     def calculate_local_vector_conorms(self, incoming):
         super(AggregatorFCFederatedPCA, self).calculate_local_vector_conorms(incoming)
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
         return True
 
     def aggregate_local_subspaces(self, incoming):
         h_matrices = []
-
-        if self.algorithm == PCA_TYPE.COVARIANCE:
-            for m in incoming:
-                h_matrices.append(m['covariance_matrix'])
-            # element wise addition
-            h_matrices = np.nansum(h_matrices, axis=0)
+        if self.algorithm == PCA_TYPE.COVARIANCE or (self.algorithm==PCA_TYPE.APPROXIMATE and self.use_smpc):
+            if self.use_smpc:
+                #allready aggregated only 1 element in list
+                h_matrices = np.array(incoming[0][COParams.COVARIANCE_MATRIX.n])
+            else:
+                for m in incoming:
+                    h_matrices.append(m[COParams.COVARIANCE_MATRIX.n])
+                # element wise addition
+                h_matrices = np.nansum(h_matrices, axis=0)
         else: #self.algorithm == PCA_TYPE.APPROXIMATE:
             for m in incoming:
-                h_matrices.append(m['local_h'])
+                h_matrices.append(m[COParams.H_LOCAL.n])
             h_matrices = np.concatenate(h_matrices, axis = 1)
         H, S, G , k = sh.svd_sub(h_matrices, self.k)
         if self.algorithm == PCA_TYPE.APPROXIMATE or self.algorithm == PCA_TYPE.COVARIANCE:
             print('Converged')
-            out = {'h_global': H, 'converged': True}
+            out = {COParams.H_GLOBAL.n: H, COParams.CONVERGED.n: True}
         else:
             # if approximate subspace is used as init method,
             # further iterations are required.
-            out = {'h_global': H, 'converged': False}
+            out = {COParams.H_GLOBAL.n: H, COParams.CONVERGED.n: False}
+        self.iteration_counter = self.iteration_counter + 1
         self.out = out
         self.send_data = True
         self.computation_done = True
@@ -214,27 +239,32 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
 
     def compute_covariance(self):
         super(AggregatorFCFederatedPCA, self).compute_covariance()
+        self.iteration_counter = self.iteration_counter + 1
         self.computation_done = True
-        self.send_data = False
+        # send data if smpc is used
+        self.send_data = self.use_smpc
         return True
 
     def compute_qr(self):
         super(AggregatorFCFederatedPCA, self).compute_qr()
+        self.iteration_counter = self.iteration_counter + 1
         self.computation_done = True
+        # Not compatible with SMPC
         self.send_data = False
         return True
 
     def aggregate_qr(self, incoming):
+        print('Aggregating R matrices')
         r_matrices = []
         for m in incoming:
-            r_matrices.append(m['r'])
+            r_matrices.append(m[COParams.R.n])
 
         r_matrices = np.concatenate(r_matrices, axis=0)
         q,r  = la.qr(r_matrices, mode='economic')
         u, s,v, nd  = sh.svd_sub(r, ndims=self.k)
-        self.out = {'h_global': v}
+        self.out = {COParams.H_GLOBAL.n: v}
         self.computation_done = True
         self.send_data = True
-
+        print('Aggregating R matrices ... DONE!')
 
 

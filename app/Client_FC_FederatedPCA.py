@@ -7,6 +7,7 @@ import traceback
 from app.Steps import Step
 import copy
 from app.algo_params import QR, PCA_TYPE
+from app.COParams import COParams
 
 class ClientFCFederatedPCA(FCFederatedPCA):
     def __init__(self):
@@ -35,6 +36,7 @@ class ClientFCFederatedPCA(FCFederatedPCA):
                 self.step_queue = self.step_queue + [Step.INIT_POWER_ITERATION]
 
             if self.federated_qr == QR.NO_QR:
+
                 self.step_queue = self.step_queue + [Step.UPDATE_H]
             else:
                 self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
@@ -54,21 +56,22 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
     def update_h(self, incoming):
         self.update_progess()
+        self.iteration_counter = self.iteration_counter + 1
         # First, update the local G estimate
-        self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
+        self.pca.G = np.dot(self.tabdata.scaled.T, incoming[COParams.H_GLOBAL.n])
         self.pca.S = np.linalg.norm(self.pca.G, axis=1)
 
         # Then check for convergence.
-        self.converged = incoming['converged']
+        self.converged = incoming[COParams.CONVERGED.n]
         if self.converged:
-            self.pca.H = incoming['h_global']
+            self.pca.H = incoming[COParams.H_GLOBAL.n]
             self.queue_shutdown()
             self.send_data = False
         else:
             self.step_queue = self.step_queue + [Step.UPDATE_H]
             # If convergence not reached, update H and go on
             self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-            self.out = {'local_h': self.pca.H}
+            self.out = {COParams.H_LOCAL.n: self.pca.H}
             self.send_data = True
         self.computation_done = True
 
@@ -82,8 +85,8 @@ class ClientFCFederatedPCA(FCFederatedPCA):
                                                  Step.NORMALISE_G]
 
     def compute_g(self, incoming):
-        self.pca.H = incoming['h_global']
-        self.converged = incoming['converged']
+        self.pca.H = incoming[COParams.H_GLOBAL.n]
+        self.converged = incoming[COParams.CONVERGED.n]
         self.pca.G = np.dot(self.tabdata.scaled.T, self.pca.H)
 
         if self.federated_qr == QR.FEDERATED_QR:
@@ -99,11 +102,13 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
     def init_power_iteration(self):
         super(ClientFCFederatedPCA, self).init_power_iteration()
+        self.iteration_counter = self.iteration_counter + 1
         self.computation_done = True
         self.send_data = True
 
     def init_approximate_pca(self):
         super(ClientFCFederatedPCA, self).init_approximate_pca()
+        self.iteration_counter = self.iteration_counter + 1
         self.computation_done = True
         self.send_data = True
 
@@ -121,12 +126,14 @@ class ClientFCFederatedPCA(FCFederatedPCA):
 
     def compute_covariance(self):
         super(ClientFCFederatedPCA, self).compute_covariance()
+        self.iteration_counter = self.iteration_counter + 1
         self.computation_done = True
         self.send_data = True
         return True
 
     def compute_qr(self):
         super(ClientFCFederatedPCA,self).compute_qr()
+        self.iteration_counter = self.iteration_counter + 1
         self.computation_done = True
         self.send_data = True
         return True

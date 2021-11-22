@@ -24,7 +24,7 @@ def summarize(files, ids, outfile):
     ids = np.asarray(ids)
     ids = np.atleast_2d(ids).T
     df = np.concatenate([ids, df], axis=1)
-    df = pd.DataFrame(df, dtype=float64)
+    df = pd.DataFrame(df, dtype=np.float64)
     cols = np.concatenate([['Run ID'], cols])
     df.columns = cols
     df = df.round(2)

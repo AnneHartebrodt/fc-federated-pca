@@ -39,6 +39,7 @@ class FCConfig:
         self.allow_transmission = False
         self.encryption = False
         self.train_test = False
+        self.use_smpc = False
 
 
 
@@ -143,6 +144,7 @@ class FCConfig:
                 try:
                     self.allow_transmission = parameter_list['privacy']['allow_transmission']
                     self.encryption = parameter_list['privacy']['encryption']
+                    self.use_smpc = parameter_list['privacy']['use_smpc']
                 except KeyError:
                     print('YAML file does not follow specification: privacy settings')
                     raise KeyError

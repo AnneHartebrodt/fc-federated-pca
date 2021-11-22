@@ -25,13 +25,29 @@ def ctrl_setup():
 @api_server.get("/status")
 def ctrl_status():
     print(f"[API] GET /status (available={logic.status_available} finished={logic.status_finished})", flush=True)
-    return json.dumps({
-        "available": logic.status_available,
-        "finished": logic.status_finished,
-        "message": logic.message,
-        "state": logic.workflow_state,
-        "progress": logic.progress,
-    })
+    if logic.status_smpc:
+        print(f"[API] GET /status (available={logic.status_available} finished={logic.status_finished}  smpc={logic.status_smpc})", flush=True)
+        json_obj = json.dumps({
+            "available": logic.status_available,
+            "finished": logic.status_finished,
+            "message": logic.message,
+            "state": logic.workflow_state,
+            "progress": logic.progress,
+            "smpc": {
+                "operation": "add",
+                "serialization": "json",
+                "shards": logic.shards,
+                "exponent": logic.exponent}
+        })
+    else:
+        json_obj = json.dumps({
+            "available": logic.status_available,
+            "finished": logic.status_finished,
+            "message": logic.message,
+            "state": logic.workflow_state,
+            "progress": logic.progress,
+        })
+    return json_obj
 
 
 @api_server.route("/data", method="GET")

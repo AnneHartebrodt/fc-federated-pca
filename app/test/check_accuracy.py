@@ -28,9 +28,18 @@ def read_config(configfile):
         config = yaml.safe_load(handle)
     return config
 
+def read_iterations(iteration_file):
+    with open(iteration_file, 'r') as handle:
+        iterations = handle.readline().split()[1]
+        runtime = round(float(handle.readline().split()[1]), 2)
+        print(iterations)
+        print(runtime)
+    return iterations, runtime
 
 
-def create_result(left_angles, right_angles,  config, run_id='NA', config_path='NA', result_path='NA'):
+
+
+def create_result(left_angles, right_angles, diff, config, run_id='NA', config_path='NA', result_path='NA'):
     l = []
     names = []
     names.append('Run ID')
@@ -50,6 +59,9 @@ def create_result(left_angles, right_angles,  config, run_id='NA', config_path='
     for a in range(len(right_angles)):
         names.append('RSV'+str(a+1))
         l.append(right_angles[a])
+    for d in range(len(diff)):
+        names.append('SV'+str(d+1))
+        l.append(diff[d])
     data = pd.DataFrame(l).T
     data.columns = names
     return data
@@ -64,8 +76,11 @@ if __name__ == '__main__':
     parser.add_argument('-r', metavar='right eigenvectors', type=str, help='filename right eigenvectors ', nargs='+')
     parser.add_argument('-L', metavar='CANONICAL', type=str, help='filename of canonical left solution')
     parser.add_argument('-R', metavar='CANONICAL', type=str, help='filename of canonical right solution')
+    parser.add_argument('-s', metavar='eigenvalue', type=str, help='eigenvalue file')
+    parser.add_argument('-S', metavar='CANONICAL eigenvalue', type=str, help='eigenvalue file')
     parser.add_argument('-o', metavar='OUTPUT', type=str, help='filename of evaluation output')
     parser.add_argument('-e', metavar='CONFIG', type=str, help='config file')
+    parser.add_argument('-i', metavar='ITERATIONS', type=str, help='iteration file')
     args = parser.parse_args()
     basedir = args.d
 
@@ -83,8 +98,19 @@ if __name__ == '__main__':
     right_angles = co.compute_angles(federated_eigenvectors, canconical_eigenvectors)
     right_angles = [np.round(a, 2) for a in right_angles]
 
+    feigenvalue = pd.read_csv(args.s, sep='\t', header=None, index_col=None).values.flatten()
+    ceigenvalue = pd.read_csv(args.S, sep='\t', header=None, index_col=None).values.flatten()
+    diff = co.compare_eigenvalues(feigenvalue, ceigenvalue)
+
     config = read_config(configfile=args.e)
-    ouput_table = create_result(left_angles, right_angles, config['fc_pca']['algorithm'],
+    subconf = config['fc_pca']['algorithm']
+    subconf['smpc'] = config['fc_pca']['privacy']['use_smpc']
+
+
+    subconf['iterations'], subconf['runtime'] = read_iterations(args.i)
+    #subconf['runtime'] = read_iterations(args.i)[1]
+
+    ouput_table = create_result(left_angles, right_angles, diff, subconf,
                                 run_id=args.o,
                                 config_path=args.e,
                                 result_path = args.R

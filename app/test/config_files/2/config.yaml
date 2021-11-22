@@ -1,0 +1,25 @@
+fc_pca:
+  algorithm:
+    algorithm: approximate_pca
+    epsilon: 1.0e-12
+    init: approximate_pca
+    max_iterations: 1000
+    pcs: 10
+    qr: no_qr
+  input:
+    batch: false
+    data: data.tsv
+    train_test: false
+  output:
+    eigenvalues: eigenvalues.tsv
+    left_eigenvectors: left_eigenvectors.tsv
+    projections: reduced_data.tsv
+    right_eigenvectors: right_eigenvectors.tsv
+  privacy:
+    allow_transmission: false
+    encryption: no_encryption
+    use_smpc: true
+  settings:
+    colnames: false
+    delimiter: "\t"
+    rownames: false
