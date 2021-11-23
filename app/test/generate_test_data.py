@@ -63,7 +63,7 @@ if __name__ == '__main__':
     if args.b <= 1:
         os.makedirs(baseline_data_folder, exist_ok=True)
         data = generate_data(number_features=args.m, number_samples=args.n, variable_means=variable_means, variable_stds=variable_stds, seed=args.s)
-        pd.DataFrame(data).to_csv(op.join(baseline_data_folder, args.f), sep='\t', header=False, index=False)
+        pd.DataFrame(data).to_csv(op.join(baseline_data_folder, args.f), sep='\t', header=True, index=False)
 
     else:
         # increment seed
@@ -71,10 +71,5 @@ if __name__ == '__main__':
             os.makedirs(op.join(baseline_data_folder, str(s)), exist_ok=True)
             data = generate_data(number_features=args.m, number_samples=args.n, variable_means=variable_means,
                                  variable_stds=variable_stds, seed=s)
-            pd.DataFrame(data).to_csv(op.join(baseline_data_folder, str(s), args.f), sep='\t', header=False, index=False)
+            pd.DataFrame(data).to_csv(op.join(baseline_data_folder, str(s), args.f), sep='\t', header=True, index=False)
 
-    # nfeatures = 5
-    # nsamples = 10
-    # seed = 11
-    #
-    # dd = generate_data(nfeatures, nsamples, seed=seed)
