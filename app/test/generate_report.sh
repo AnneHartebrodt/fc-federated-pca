@@ -76,4 +76,4 @@ echo $ids
 python $pydir/runstats.py -d $test_report -o "run_summaries.tsv" -f $tests -i $ids
 # generate report
 python $pydir/generate_report.py -d $test_report/test_results -r $test_report/report.md
-pandoc $test_report/report.md -f markdown -t html -s -o $test_report/report.html --css $pydir/templates/pandoc.css
+pandoc $test_report/report.md -f markdown -t html -o $test_report/report.html --css $pydir/templates/pandoc.css

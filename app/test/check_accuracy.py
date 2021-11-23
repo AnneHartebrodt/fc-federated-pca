@@ -43,7 +43,12 @@ def create_result(left_angles, right_angles, diff, config, run_id='NA', config_p
     l = []
     names = []
     names.append('Run ID')
-    l.append(run_id)
+    names.append('seed')
+    names.append('t')
+
+    ar = run_id.split('_')
+    for a in ar:
+        l.append(a.split('.')[0])
 
     #names.append('Config file')
     #l.append(config_path)

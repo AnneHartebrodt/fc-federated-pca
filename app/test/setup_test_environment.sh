@@ -1,10 +1,10 @@
-#clidir=/home/anne/Documents/featurecloud/test-environment/cli
-#pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
-#basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
+clidir=/home/anne/Documents/featurecloud/test-environment/cli
+pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
 
-basedir=$1
-clidir=$2
-pydir=$3
+#basedir=$1
+#clidir=$2
+#pydir=$3
 echo $pydir
 echo $basedir
 echo $clidir
