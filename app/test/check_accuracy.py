@@ -106,6 +106,7 @@ if __name__ == '__main__':
     feigenvalue = pd.read_csv(args.s, sep='\t', header=None, index_col=None).values.flatten()
     ceigenvalue = pd.read_csv(args.S, sep='\t', header=None, index_col=None).values.flatten()
     diff = co.compare_eigenvalues(feigenvalue, ceigenvalue)
+    diff = [np.round(d,2) for d in diff]
 
     config = read_config(configfile=args.e)
     subconf = config['fc_pca']['algorithm']
