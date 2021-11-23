@@ -22,6 +22,7 @@ def write_markdown_report(basedir, report, runstats=None):
     if runstats is not None:
         runs = pd.read_csv(op.join(basedir,'..' ,runstats), sep='\t', engine='python', header=0, index_col=None)
 
+    table.to_csv(op.join(basedir, 'summary.tsv'), sep='\t', header=True,index=False)
     mdr = md.df_to_markdown(table)
     #mdr2 = md.df_to_markdown(runs)
     with open(report, 'w') as handle:
