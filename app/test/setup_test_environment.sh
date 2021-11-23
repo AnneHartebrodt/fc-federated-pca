@@ -9,9 +9,11 @@ clidir=$2
 pydir=$3
 outputfolder=$basedir/$4
 
-echo $pydir
+
 echo $basedir
 echo $clidir
+echo $pydir
+echo $outputfolder
 mkdir -p $outputfolder
 
 features=10
