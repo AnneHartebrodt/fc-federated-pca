@@ -42,7 +42,9 @@ class FCFederatedPCA:
         self.start_time = time.monotonic()
 
     def next_state(self):
+        c = self.step
         self.state = self.step_queue.pop(0)
+        print('STATE Transition: ' + str(c) + ' ===> '+str(self.state))
         return self.state
 
     def peek_next_state(self):
@@ -55,7 +57,7 @@ class FCFederatedPCA:
         return self.state
 
     def copy_configuration(self, config, directory, train=''):
-        print('Copy configuration')
+        print('[STARTUP] Copy configuration')
         self.config_available = config.config_available
         self.batch = config.batch
         self.directories = config.directories
@@ -79,7 +81,7 @@ class FCFederatedPCA:
         self.allow_transmission = config.allow_transmission
         self.encryption = config.encryption
 
-        print('[Client] Configuation copied')
+        print('[STARTUP] Configuration copied')
 
     def update_progess(self):
         ## allow 60 percent of the progress bar for the iterations
@@ -97,19 +99,21 @@ class FCFederatedPCA:
 
 
     def init_random(self):
-        print('init random')
+        print('[STARTUP] Random initialisation')
         self.progress = 0.2
         self.pca = SVD.init_random(self.tabdata, k=self.k)
         self.k = self.pca.k
         return True
 
     def init_approximate(self):
+        print('[STARTUP] Approximate initialisation')
         self.progress = 0.2
         self.pca = SVD.init_local_subspace(self.tabdata, k=self.k)
         self.k = self.pca.k
         return True
 
     def compute_covariance(self):
+        print('[STARTUP] Computing covariance matrix')
         self.init_random()
         self.progress = 0.2
         self.covariance = np.dot(self.tabdata.scaled, self.tabdata.scaled.T)
@@ -120,11 +124,11 @@ class FCFederatedPCA:
 
     def set_parameters(self, incoming):
         try:
-            print('[API] setting parameters')
+            print('[API] Setting parameters')
             self.k = incoming[COParams.PCS.n]
             self.computation_done = True
         except Exception as e:
-            print('[API] setting parameters failed')
+            print('[API] Setting parameters failed')
             traceback.print_exc()
         return True
 
@@ -231,8 +235,7 @@ class FCFederatedPCA:
         self.converged = False
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
         self.out = {COParams.H_LOCAL.n: self.pca.H}
-        if self.federated_qr == QR.FEDERATED_QR:
-            self.init_federated_qr()
+        self.init_federated_qr()
 
     def init_approximate_pca(self):
         self.iteration_counter = 0

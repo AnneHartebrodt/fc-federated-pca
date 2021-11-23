@@ -1,4 +1,4 @@
-import shutil
+import logging
 import threading
 import time
 import jsonpickle
@@ -14,6 +14,7 @@ from app.params import OUTPUT_DIR
 import numpy as np
 import pandas as pd
 from app.COParams import COParams
+import traceback as tb
 
 
 class AppLogic:
@@ -27,7 +28,7 @@ class AppLogic:
         #
         self.use_smpc = False
         self.status_smpc = False
-        self.exponent = 3
+        self.exponent = -1
         self.shards = 1
         # Will stop execution when True
         self.status_finished = False
@@ -76,18 +77,16 @@ class AppLogic:
         self.shards = len(self.clients)
         print(f"Received setup: {self.id} {self.coordinator} {self.clients}", flush=True)
         self.configure()
-        print('Test')
         self.start_time = time.monotonic()
         self.svd = {}
-        print('Test')
         # batch config loops over the files
         if self.config.batch:
-            print('batch mode')
-            print(self.config.directories)
+            print('[STARTUP] Batch mode initialised')
             i = 0
             for d in self.config.directories:
 
                 if self.config.train_test:
+                    print('[STARTUP] Train/Test mode initialised')
                     l = ['train', 'test']
                 else:
                     l = ['']
@@ -96,31 +95,30 @@ class AppLogic:
                         self.svd[i] = AggregatorFCFederatedPCA()
                     else:
                         self.svd[i] = ClientFCFederatedPCA()
-                    print('Object created')
                     self.svd[i].step = Step.LOAD_CONFIG
                     self.svd[i].copy_configuration(self.config, d, t)
-                    print('Configuration copied')
+                    print('[STARTUP] Configuration copied')
                     self.svd[i].finalize_parameter_setup()
-                    print('Setup finalized')
+                    print('[STARTUP] finalized')
                     i = i + 1
 
         else:
-            print('single mode')
+            print('[STARTUP] Single mode')
             if self.coordinator:
                 self.svd[0] = AggregatorFCFederatedPCA()
             else:
                 self.svd[0] = ClientFCFederatedPCA()
-            print('Object created')
             self.svd[0].step = Step.LOAD_CONFIG
             self.svd[0].copy_configuration(self.config, '', '')
-            print('Configuartion copied')
+            print('[STARTUP] Configuration copied')
             self.svd[0].finalize_parameter_setup()
+            print('[STARTUP] finalized')
 
         # set the pointer to the first action
         for i in range(len(self.svd)):
             self.svd[i].step = self.svd[i].next_state()
 
-        print('start flow')
+        print('[STARTUP] Starting flow!')
         self.use_smpc = self.svd[0].use_smpc
         print(self.use_smpc)
         print(self.svd[0].use_smpc)
@@ -129,18 +127,14 @@ class AppLogic:
 
     def handle_incoming(self, data, query, content_length):
         # This method is called when new data arrives
-        print("Process incoming data....", flush=True)
+        print("[CLIENT] Process incoming data....", flush=True)
         client = query.getunicode('client')
-
-        print('client: '+str(client))
         incoming = data.read()
-        print('Recieved data length:')
+        print('Recieved data length:'+ str(content_length))
         self.communication_logger.append(content_length)
         # Here we use a dictionary because some information is client
         # specific
-        print(incoming)
         incoming = jsonpickle.decode(incoming)
-        print(incoming)
         for i in incoming.keys():
             j = int(i)
             try:
@@ -151,10 +145,9 @@ class AppLogic:
             if step in self.svd[j].data_incoming.keys():
                 self.svd[j].data_incoming[step][client] = incoming[i]
             else:
-                print('Step'+str(step))
                 self.svd[j].data_incoming[step] = {}
                 self.svd[j].data_incoming[step][client] = incoming[i]
-        print("Process incoming data.... DONE!", flush=True)
+        print("[CLIENT] Process incoming data.... DONE!", flush=True)
 
     def aux_step_mapper(self, keys):
         for k in keys:
@@ -166,11 +159,11 @@ class AppLogic:
         if self.id is not None:  # Test is setup has happened already
             # parse parameters
             self.config = FCConfig()
-            print('Config created')
             self.config.parse_configuration()
             print("[CLIENT] finished parsing parameter file.", flush=True)
 
     def shutdown(self):
+        print('[SHUTDOWN] logging run statistics')
         log_file = op.join(OUTPUT_DIR, 'logs.txt')
         end = time.monotonic()
         with open(log_file, 'w') as handle:
@@ -190,7 +183,7 @@ class AppLogic:
 
 
     def handle_outgoing(self):
-        print("Process outgoing data...", flush=True)
+        print("[CLIENT] Process outgoing data...", flush=True)
         # This method is called when data is requested
         outgoing_data = self.data_outgoing
         self.data_outgoing = None
@@ -203,10 +196,8 @@ class AppLogic:
         outgoing_dict = {}
         smpc_outgoing_dict = {}
         while True:
-            self.progress = self.svd[0].progress
             self.message = self.svd[0].step.step
             for i in range(len(self.svd)):
-                print("Current step " + str(self.svd[i].step))
                 if self.svd[i].step == Step.WAIT_FOR_PARAMS:
                     wait_for = Step.LOAD_CONFIG
                     print('CLIENT waiting for parameters ' + str(wait_for))
@@ -217,43 +208,81 @@ class AppLogic:
                             self.svd[i].data_incoming.pop(wait_for, None)
                             self.svd[i].set_parameters(incoming)
                         except Exception as e:
-
-                            print("Error loading configuration")
-                            print(e)
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
                         
                 elif self.svd[i].step == Step.READ_DATA:
                     wait_for = Step.WAIT_FOR_PARAMS
-                    print("[CLIENT] Read input...", flush=True)
-                    self.svd[i].read_input_files()
-                    self.svd[i].data_incoming.pop(wait_for, None)
-                    print("[CLIENT] Read input finished.", flush=True)
+                    try:
+                        print("[CLIENT] Read input...", flush=True)
+                        self.svd[i].read_input_files()
+                        self.svd[i].data_incoming.pop(wait_for, None)
+                        print("[CLIENT] Read input finished.", flush=True)
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
+
     
                 elif self.svd[i].step == Step.INIT_POWER_ITERATION:
-                    self.iteration = self.iteration + 1
-                    self.svd[i].init_random()
-                    self.svd[i].init_power_iteration()
+                    try:
+                        self.iteration = self.iteration + 1
+                        self.svd[i].init_random()
+                        self.svd[i].init_power_iteration()
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.APPROXIMATE_LOCAL_PCA:
-                    self.svd[i].init_approximate()
-                    self.svd[i].init_approximate_pca()
+                    try:
+                        self.svd[i].init_approximate()
+                        self.svd[i].init_approximate_pca()
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
 
                 elif self.svd[i].step == Step.COMPUTE_COVARIANCE:
-                    self.svd[i].compute_covariance()
+                    try:
+                        self.svd[i].compute_covariance()
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
 
                 elif self.svd[i].step == Step.COMPUTE_QR:
-                    self.svd[i].compute_qr()
+                    try:
+                        self.svd[i].compute_qr()
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
 
                 elif self.svd[i].step == Step.AGGREGATE_QR:
                     wait_for = Step.COMPUTE_QR
                     print('CLIENT waiting for parameters ' + str(wait_for) + " "+str(len(self.clients)))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) == len(
                             self.clients):
-                        print("[COORDINATOR] Received data of all participants.", flush=True)
-                        print("[COORDINATOR] Aggregate results...", flush=True)
-                        # Decode received data of each client
-                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
-                        # Empty the incoming data (important for multiple iterations)
-                        self.svd[i].aggregate_qr(incoming)
+                        try:
+                            print("[COORDINATOR] Received data of all participants.", flush=True)
+                            print("[COORDINATOR] Aggregate results...", flush=True)
+                            # Decode received data of each client
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].aggregate_qr(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
 
 
                 elif self.svd[i].step == Step.AGGREGATE_SUBSPACES:
@@ -264,13 +293,19 @@ class AppLogic:
                     # if smpc 1 client has sent the aggregate
                     if wait_for in self.svd[i].data_incoming.keys() and \
                             len(self.svd[i].data_incoming[wait_for]) == len(self.clients):
-                        print("[COORDINATOR] Received data of all participants.", flush=True)
-                        print("[COORDINATOR] Aggregate results...", flush=True)
-                        # Decode received data of each client
-                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
-                        # Empty the incoming data (important for multiple iterations)
-                        self.svd[i].data_incoming.pop(wait_for, None)
-                        self.svd[i].aggregate_local_subspaces(incoming)
+                        try:
+                            print("[COORDINATOR] Received data of all participants.", flush=True)
+                            print("[COORDINATOR] Aggregate results...", flush=True)
+                            # Decode received data of each client
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].aggregate_local_subspaces(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
 
                 elif self.svd[i].step == Step.AGGREGATE_COVARIANCE:
                     wait_for = Step.COMPUTE_COVARIANCE
@@ -282,13 +317,19 @@ class AppLogic:
                     if wait_for in self.svd[i].data_incoming.keys() and \
                             (len(self.svd[i].data_incoming[wait_for]) == len(self.clients) or
                                     len(self.svd[i].data_incoming[wait_for]) == 1 and self.use_smpc):
-                        print("[COORDINATOR] Received data of all participants.", flush=True)
-                        print("[COORDINATOR] Aggregate results...", flush=True)
-                        # Decode received data of each client
-                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
-                        # Empty the incoming data (important for multiple iterations)
-                        self.svd[i].data_incoming.pop(wait_for, None)
-                        self.svd[i].aggregate_local_subspaces(incoming)
+                        try:
+                            print("[COORDINATOR] Received data of all participants.", flush=True)
+                            print("[COORDINATOR] Aggregate results...", flush=True)
+                            # Decode received data of each client
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].aggregate_local_subspaces(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
 
 
                 elif self.svd[i].step == Step.COMPUTE_G_LOCAL:
@@ -300,25 +341,31 @@ class AppLogic:
                         wait_for = Step.INIT_POWER_ITERATION
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
-                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
-                        # Decode broadcasted data
-                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
-                        incoming = self.svd[i].data_incoming[wait_for][key]
-                        # Empty incoming data
-                        self.svd[i].data_incoming.pop(wait_for, None)
                         try:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            # Empty incoming data
+                            self.svd[i].data_incoming.pop(wait_for, None)
                             self.svd[i].compute_g(incoming)
                             self.svd[i].silent_step = True
-                        except:
-                            print('G computation failed')
-    
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
+
                 elif self.svd[i].step == Step.COMPUTE_H_LOCAL:
                     if self.svd[i].federated_qr == QR.FEDERATED_QR:
                         try:
                             print('Computing H')
                             self.svd[i].compute_h_local_g()
                         except Exception as e:
-                            print('H computation failed')
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.AGGREGATE_H:
                     if Step.COMPUTE_H_LOCAL in self.svd[i].data_incoming.keys():
@@ -331,17 +378,19 @@ class AppLogic:
                     if wait_for in self.svd[i].data_incoming.keys() and \
                             (len(self.svd[i].data_incoming[wait_for]) == len(self.clients) or
                              len(self.svd[i].data_incoming[wait_for]) == 1 and self.use_smpc):
-                        print("[COORDINATOR] Received data of all participants.", flush=True)
-                        print("[COORDINATOR] Aggregate results...", flush=True)
                         try:
+                            print("[COORDINATOR] Received data of all participants.", flush=True)
+                            print("[COORDINATOR] Aggregate results...", flush=True)
                             # Decode received data of each client
                             incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
                             # Empty the incoming data (important for multiple iterations)
                             self.svd[i].data_incoming.pop(wait_for, None)
                             self.svd[i].aggregate_h(incoming)
                         except Exception as e:
-                            print('H aggregation failed')
-                            print(e)
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.UPDATE_H:
                     if Step.AGGREGATE_SUBSPACES in self.svd[i].data_incoming.keys():
@@ -350,96 +399,144 @@ class AppLogic:
                         wait_for = Step.AGGREGATE_H
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
-                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
-                        # Decode broadcasted data
-                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
-                        incoming = self.svd[i].data_incoming[wait_for][key]
-                        self.svd[i].data_incoming.pop(wait_for, None)
-                        self.svd[i].update_h(incoming)
+                        try:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].update_h(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
 
     
     
                 elif self.svd[i].step == Step.COMPUTE_LOCAL_NORM:
                     if self.svd[i].silent_step:
-                        self.svd[i].silent_step = False
-                        self.svd[i].compute_local_eigenvector_norm()
+                        try:
+                            self.svd[i].silent_step = False
+                            self.svd[i].compute_local_eigenvector_norm()
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
     
     
                 elif self.svd[i].step == Step.COMPUTE_LOCAL_CONORM:
                     wait_for = Step.AGGREGATE_NORM
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
-                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
-                        # Decode broadcasted data
-                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
-                        incoming = self.svd[i].data_incoming[wait_for][key]
-                        # Empty incoming data
-                        self.svd[i].data_incoming.pop(wait_for, None)
-                        self.svd[i].calculate_local_vector_conorms(incoming)
+                        try:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            # Empty incoming data
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].calculate_local_vector_conorms(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
 
     
                 elif self.svd[i].step == Step.ORTHOGONALISE_CURRENT:
                     wait_for = Step.AGGREGATE_CONORM
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
-                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
-                        # Decode broadcasted data
-                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
-                        incoming = self.svd[i].data_incoming[wait_for][key]
-                        # Empty incoming data
-                        self.svd[i].data_incoming.pop(wait_for, None)
+                        try:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            # Empty incoming data
+                            self.svd[i].data_incoming.pop(wait_for, None)
 
-                        self.svd[i].orthogonalise_current(incoming)
-                        self.svd[i].silent_step = True
+                            self.svd[i].orthogonalise_current(incoming)
+                            self.svd[i].silent_step = True
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.AGGREGATE_NORM:
                     wait_for = Step.COMPUTE_LOCAL_NORM
                     if wait_for in self.svd[i].data_incoming.keys() and \
                             (len(self.svd[i].data_incoming[wait_for]) == len(self.clients) or
                              len(self.svd[i].data_incoming[wait_for]) == 1 and self.use_smpc):
-                        print("[COORDINATOR] Received data of all participants.", flush=True)
-                        print("[COORDINATOR] Aggregate results...", flush=True)
-                        # Decode received data of each client
-                        # the parameters are client specific
-                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
-                        # Empty the incoming data (important for multiple iterations)
-                        self.svd[i].data_incoming.pop(wait_for, None)
-                        self.svd[i].aggregate_eigenvector_norms(incoming)
+                        try:
+                            print("[COORDINATOR] Received data of all participants.", flush=True)
+                            print("[COORDINATOR] Aggregate results...", flush=True)
+                            # Decode received data of each client
+                            # the parameters are client specific
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].aggregate_eigenvector_norms(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.AGGREGATE_CONORM:
                     wait_for = Step.COMPUTE_LOCAL_CONORM
                     if wait_for in self.svd[i].data_incoming.keys() and \
                             (len(self.svd[i].data_incoming[wait_for]) == len(self.clients) or
                              len(self.svd[i].data_incoming[wait_for]) == 1 and self.use_smpc):
-                        print("[COORDINATOR] Received data of all participants.", flush=True)
-                        print("[COORDINATOR] Aggregate results...", flush=True)
-                        incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
-                        # Empty the incoming data (important for multiple iterations)
-                        self.svd[i].data_incoming.pop(wait_for, None)
-                        self.svd[i].aggregate_conorms(incoming)
+                        try:
+                            print("[COORDINATOR] Received data of all participants.", flush=True)
+                            print("[COORDINATOR] Aggregate results...", flush=True)
+                            incoming = [client_data for client_data in self.svd[i].data_incoming[wait_for].values()]
+                            # Empty the incoming data (important for multiple iterations)
+                            self.svd[i].data_incoming.pop(wait_for, None)
+                            self.svd[i].aggregate_conorms(incoming)
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
 
     
                 elif self.svd[i].step == Step.NORMALISE_G:
                     wait_for = Step.AGGREGATE_NORM
                     print('CLIENT waiting for parameters ' + str(wait_for))
                     if wait_for in self.svd[i].data_incoming.keys() and len(self.svd[i].data_incoming[wait_for]) > 0:
-                        print("[CLIENT] Process aggregated result from coordinator...", flush=True)
-                        # Decode broadcasted data
-                        key = list(self.svd[i].data_incoming[wait_for].keys())[0]
-                        incoming = self.svd[i].data_incoming[wait_for][key]
-                        # Empty incoming data
-                        self.svd[i].data_incoming.pop(wait_for, None)
                         try:
+                            print("[CLIENT] Process aggregated result from coordinator...", flush=True)
+                            # Decode broadcasted data
+                            key = list(self.svd[i].data_incoming[wait_for].keys())[0]
+                            incoming = self.svd[i].data_incoming[wait_for][key]
+                            # Empty incoming data
+                            self.svd[i].data_incoming.pop(wait_for, None)
                             self.svd[i].normalise_orthogonalised_matrix(incoming)
-                        except:
-                            print('G normalisation failed')
+                        except Exception as e:
+                            print('[ERROR]')
+                            self.message('[Error] in step: ' + str(self.svd[i].step))
+                            self.workflow_state = 'error'
+                            tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.COMPUTE_PROJECTIONS:
                     try:
                         self.svd[i].compute_projections()
-                    except:
-                        print('Computation of projections failed.')
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
     
                 elif self.svd[i].step == Step.SAVE_PROJECTIONS:
-                    self.svd[i].save_projections()
+                    try:
+                        self.svd[i].save_projections()
+                    except Exception as e:
+                        print('[ERROR]')
+                        self.message('[Error] in step: ' + str(self.svd[i].step))
+                        self.workflow_state = 'error'
+                        tb.print_exception(type(e), e, e.__traceback__)
     
     
                 elif self.svd[i].step == Step.SAVE_SVD:

@@ -64,6 +64,8 @@ class ClientFCFederatedPCA(FCFederatedPCA):
         self.converged = incoming[COParams.CONVERGED.n]
         if self.converged:
             self.pca.H = incoming[COParams.H_GLOBAL.n]
+            self.silent_step = True
+            self.queue_qr()
             self.queue_shutdown()
             self.send_data = False
         else:

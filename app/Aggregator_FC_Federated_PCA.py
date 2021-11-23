@@ -144,6 +144,8 @@ class AggregatorFCFederatedPCA(FCFederatedPCA):
         print('Orthonormalised')
         converged, deltas = eigenvector_convergence_checker(global_HI_matrix, self.pca.previous_h, tolerance=self.epsilon)
         if self.iteration_counter == self.max_iterations or converged:
+            self.step_queue = self.step_queue + [Step.COMPUTE_G_LOCAL]
+            self.queue_qr()
             self.queue_shutdown()
             self.converged = True
             print('CONVERGED')
