@@ -8,9 +8,6 @@ pydir=$3
 test_report=$4
 #test_report=/home/anne/Documents/featurecloud/apps/tests
 
-
-sudo mkdir -p $test_report
-
 seed=11
 for od in $(ls $basedir/tests/ )
 do
@@ -73,7 +70,7 @@ tests=$(printf "$basedir/tests/%s/$cl/logs.txt " "${od[@]}")
 ids=$(printf "%s " "${od[@]}")
 echo $tests
 echo $ids
-#python $pydir/runstats.py -d $test_report -o "run_summaries.tsv" -f $tests -i $ids
+python $pydir/runstats.py -d $test_report -o "run_summaries.tsv" -f $tests -i $ids
 # generate report
 python $pydir/generate_report.py -d $test_report/test_results -r $test_report/report.md
 pandoc $test_report/report.md -f markdown -t html -o $test_report/report.html --css $pydir/templates/pandoc.css
