@@ -11,6 +11,8 @@ cd cli
 # requirements file is for pip
 # remove '~' to fit conda
 conda create --name cli --file requirements_conda.txt
+# additional dependecies
+conda install pyyaml scipy pando markdown
 cd ..
 ```
 
@@ -47,6 +49,6 @@ bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)
 
 ### Generate the report
 ```
-mkdit test-output
+mkdir test-output
 bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-output
 ```
