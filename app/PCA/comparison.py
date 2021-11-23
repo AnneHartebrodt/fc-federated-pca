@@ -53,7 +53,7 @@ def compute_correlations(canonical, split, reported_angles=20):
 def compare_eigenvalues(canonical, federated):
     diff = []
     for i in min(len(canonical), len(federated)):
-        diff.append(abs(canonical[i]-federated[i]))
+        diff.append(np.round(abs(canonical[i]-federated[i]), 2))
     return diff
 
 
