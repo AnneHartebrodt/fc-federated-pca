@@ -2,12 +2,12 @@
 #pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
 #basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
 datafile=data.tsv
-outputfolder=$basedir/app_test
+#outputfolder=$basedir/app_test
 
 basedir=$1
 clidir=$2
 pydir=$3
-
+outputfolder=$basedir/$4
 
 echo $pydir
 echo $basedir
