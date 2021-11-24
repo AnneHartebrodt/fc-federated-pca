@@ -27,11 +27,20 @@ def summarize(files, ids, outfile):
             print('File not found')
     df = pd.concat(dfl, axis=1)
     df = df.transpose().values
+<<<<<<< HEAD
     actual_ids= np.array(actual_ids)
     actual_ids = np.atleast_2d(actual_ids).T
     df = np.concatenate([actual_ids, df], axis=1)
     df = pd.DataFrame(df)
     cols = ['Run ID'] + cols.tolist()
+=======
+    ids = np.asarray(ids)
+    ids = np.atleast_2d(ids).T
+    print(ids)
+    df = np.concatenate([ids, df], axis=1)
+    df = pd.DataFrame(df, dtype=np.float64)
+    cols = np.concatenate([['Run ID'], cols])
+>>>>>>> e370f46da73d3d020fe843d54f066941e023a3b4
     df.columns = cols
     #df = df.round(2)
     df.to_csv(outfile, sep='\t', index = False)

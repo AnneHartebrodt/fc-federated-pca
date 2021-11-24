@@ -8,9 +8,13 @@ basedir=$1
 clidir=$2
 pydir=$3
 datafile=$4
-outputfolder=$basedir/$5
+<<<<<<< HEAD
+outputfolder=$5
 seed=$6
 sites=$7
+=======
+outputfolder=$basedir/$5
+>>>>>>> bffe05ec5ccdb855b3891e12b8456456126b1c3c
 
 echo $pydir
 echo $basedir
