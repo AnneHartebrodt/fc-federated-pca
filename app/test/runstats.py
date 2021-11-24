@@ -18,6 +18,7 @@ def summarize(files, ids, outfile):
     for f in files:
         try:
             df = pd.read_csv(f, sep='\t', header=None, index_col=None)
+            print(df)
             dfl.append(df.iloc[:,1])
             cols = df.iloc[:,0].values
         except:
