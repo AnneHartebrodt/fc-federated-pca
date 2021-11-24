@@ -9,23 +9,20 @@ clidir=$2
 pydir=$3
 datafile=$4
 outputfolder=$5
+seed=$6
+sites=$7
 
 echo $pydir
 echo $basedir
 echo $clidir
 mkdir -p $outputfolder
 
-features=10
-samples=5000
-seed=11
-batchcount=3
 k=10
 
 #compute canonical solution
 python $pydir/compute_canonical_solution.py -d $outputfolder -f $datafile -k $k -s $seed -b True --transpose True
 
 #split the data into batches
-sites=4
 batch=False
 cross_val=False
 dirname=single
