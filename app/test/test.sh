@@ -1,18 +1,24 @@
 mydir=$(pwd)
-basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
-#current_test_dir_suffix=app_test/batch_cross
+
+basedir=$1
+clidir=$2
+pydir=$3
+app_test=$4
+#clidir=/home/anne/Documents/featurecloud/test-environment/cli
+#pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+#basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
+#app_test=app_test
+#
+#
+# current_test_dir_suffix=app_test/batch_cross
 
 
 controller_data_test_result=$basedir/tests
 
-clidir=/home/anne/Documents/featurecloud/test-environment/cli
-pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
-
-
 count=1
 outdirs=()
-# "app_test/single" "app_test/batch_cross" "app_test/batch"
-suffix_list=( "app_test/single" "app_test/batch_cross" "app_test/batch")
+
+suffix_list=( "$app_test/single" "$app_test/batch_cross" "$app_test/batch")
 
 for current_test_dir_suffix in "${suffix_list[@]}"
 do
@@ -32,16 +38,17 @@ do
 
   # generate a random string to use as the output directory
   outputdir=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')
+  outputdir=$app_test/$outputdir
   outdirs[${#outdirs[@]}]=$outputdir
-  sudo mkdir $controller_data_test_result/$outputdir
+  sudo mkdir -p $controller_data_test_result/$app_test
 
 
   #echo $dirs
-  echo python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
+  echo python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
     --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
-  python /home/anne/Documents/featurecloud/test-environment/cli/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
+  python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
     --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
-  echo "test done"
+
 done
 done
 

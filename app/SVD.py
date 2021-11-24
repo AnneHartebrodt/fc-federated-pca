@@ -54,7 +54,7 @@ class SVD:
         """
         k = min(tabdata.col_count, k)
         print(k)
-        H, S, G, k = sh.svd_sub(tabdata.data, ndims=k)
+        H, S, G, k = sh.svd_sub(tabdata.data, ndims=k*2)
         return cls(H, G, S, tabdata, k)
 
     @classmethod

@@ -9,12 +9,15 @@ import traceback
 from app.Steps import Step
 import numpy as np
 import copy
-from app.QR_params import QR
+from app.algo_params import QR
 from shutil import copyfile
 from shutil import copyfile
 from app.SVD import SVD
 from app.params import INPUT_DIR, OUTPUT_DIR
 import pathlib as pl
+import scipy.linalg as la
+from app.COParams import COParams
+import time
 
 class FCFederatedPCA:
     def __init__(self):
@@ -35,9 +38,13 @@ class FCFederatedPCA:
         self.data_incoming = {}
         self.progress = 0.0
         self.silent_step=False
+        self.use_smpc = False
+        self.start_time = time.monotonic()
 
     def next_state(self):
+        c = self.step
         self.state = self.step_queue.pop(0)
+        print('STATE Transition: ' + str(c) + ' ===> '+str(self.state))
         return self.state
 
     def peek_next_state(self):
@@ -50,6 +57,7 @@ class FCFederatedPCA:
         return self.state
 
     def copy_configuration(self, config, directory, train=''):
+        print('[STARTUP] Copy configuration')
         self.config_available = config.config_available
         self.batch = config.batch
         self.directories = config.directories
@@ -58,10 +66,12 @@ class FCFederatedPCA:
         self.right_eigenvector_file = op.join(OUTPUT_DIR, directory, train, config.right_eigenvector_file)
         self.eigenvalue_file = op.join(OUTPUT_DIR, directory, train, config.eigenvalue_file)
         self.projection_file = op.join(OUTPUT_DIR, directory, train, config.projection_file)
+        self.log_file = op.join(OUTPUT_DIR, directory, train, 'run_log.txt')
         self.k = config.k
         self.algorithm = config.algorithm
         self.federated_qr = config.federated_qr
         self.max_iterations = config.max_iterations
+        self.use_smpc = config.use_smpc
         self.epsilon = config.epsilon
         self.init_method = config.init_method
 
@@ -71,7 +81,7 @@ class FCFederatedPCA:
         self.allow_transmission = config.allow_transmission
         self.encryption = config.encryption
 
-        print('[Client] Configuation copied')
+        print('[STARTUP] Configuration copied')
 
     def update_progess(self):
         ## allow 60 percent of the progress bar for the iterations
@@ -89,26 +99,36 @@ class FCFederatedPCA:
 
 
     def init_random(self):
-        print('init random')
+        print('[STARTUP] Random initialisation')
         self.progress = 0.2
         self.pca = SVD.init_random(self.tabdata, k=self.k)
         self.k = self.pca.k
         return True
 
     def init_approximate(self):
+        print('[STARTUP] Approximate initialisation')
         self.progress = 0.2
         self.pca = SVD.init_local_subspace(self.tabdata, k=self.k)
         self.k = self.pca.k
         return True
 
+    def compute_covariance(self):
+        print('[STARTUP] Computing covariance matrix')
+        self.init_random()
+        self.progress = 0.2
+        self.covariance = np.dot(self.tabdata.scaled, self.tabdata.scaled.T)
+        self.k = self.pca.k
+        self.out = {COParams.COVARIANCE_MATRIX.n: self.covariance}
+        return True
+
 
     def set_parameters(self, incoming):
         try:
-            print('[API] setting parameters')
-            self.k = incoming['pcs']
+            print('[API] Setting parameters')
+            self.k = incoming[COParams.PCS.n]
             self.computation_done = True
         except Exception as e:
-            print('[API] setting parameters failed')
+            print('[API] Setting parameters failed')
             traceback.print_exc()
         return True
 
@@ -122,23 +142,30 @@ class FCFederatedPCA:
         return True
 
     def update_and_save_pca(self, incoming):
+        self.save_logs()
         # update PCA and save
-        self.pca.G = np.dot(self.tabdata.scaled.T, incoming['h_global'])
-        self.pca.S = np.linalg.norm(self.pca.G, axis=1)
-        self.pca.H = incoming['h_global']
+        self.pca.G = np.dot(self.tabdata.scaled.T, incoming[COParams.H_GLOBAL.n])
+        self.pca.H = incoming[COParams.H_GLOBAL.n]
+        self.pca.S = np.sqrt(np.linalg.norm(self.pca.G, axis=1))
         self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False
 
     def save_pca(self):
         # update PCA and save
+        self.save_logs()
         self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False
 
+    def save_logs(self):
+        with open(self.log_file, 'w') as handle:
+            handle.write('iterations:\t'+str(self.iteration_counter)+'\n')
+            handle.write('runtime:\t' + str(time.monotonic()-self.start_time)+'\n')
+
     def orthogonalise_current(self, incoming):
         print('starting orthogonalise_current')
-        self.global_conorms = incoming['global_conorms']
+        self.global_conorms = incoming[COParams.GLOBAL_CONORMS.n]
         # update every cell individually
         for gp in range(len(self.global_conorms)):
             for row in range(self.pca.G.shape[0]):
@@ -152,7 +179,7 @@ class FCFederatedPCA:
 
         print('Normalising')
         # get the last eigenvector norm
-        self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
+        self.all_global_eigenvector_norms.append(incoming[COParams.GLOBAL_EIGENVECTOR_NORM.n])
 
         # divide all elements through the respective vector norm.
         for col in range(self.pca.G.shape[1]):
@@ -207,33 +234,38 @@ class FCFederatedPCA:
         self.iteration_counter = 0
         self.converged = False
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
-        if self.federated_qr == QR.FEDERATED_QR:
-            self.init_federated_qr()
+        self.out = {COParams.H_LOCAL.n: self.pca.H}
+        self.init_federated_qr()
 
     def init_approximate_pca(self):
-        self.interation_counter = 0
+        self.iteration_counter = 0
         self.converged = False
-        self.out = {'local_h': self.pca.H}
+        if self.use_smpc:
+            proxy_covariance = np.dot(self.pca.H, self.pca.H.T)
+            self.out = {COParams.COVARIANCE_MATRIX.n: proxy_covariance}
+        else:
+            self.out = {COParams.H_LOCAL.n: self.pca.H}
         if self.federated_qr == QR.FEDERATED_QR:
             self.init_federated_qr()
 
     def compute_h_local_g(self):
         self.update_progess()
         self.pca.H = np.dot(self.tabdata.scaled, self.pca.G)
-        self.out = {'local_h': self.pca.H}
+        self.out = {COParams.H_LOCAL.n: self.pca.H}
         return True
 
     def calculate_local_vector_conorms(self, incoming):
         vector_conorms = []
         # append the lastly calculated norm to the list of global norms
-        self.all_global_eigenvector_norms.append(incoming['global_eigenvector_norm'])
+        self.all_global_eigenvector_norms.append(incoming[COParams.GLOBAL_EIGENVECTOR_NORM.n])
         for cvi in range(self.current_vector):
             vector_conorms.append(np.dot(self.pca.G[:, cvi], self.pca.G[:, self.current_vector]) / self.all_global_eigenvector_norms[cvi])
         self.local_vector_conorms = vector_conorms
         if self.current_vector == self.k:
             self.orthonormalisation_done = True
-        self.out = {'local_conorms': self.local_vector_conorms}
+        local_conorms = [float(a) for a in self.local_vector_conorms]
+        self.out = {COParams.LOCAL_CONORMS.n: local_conorms}
+        #self.out = {COParams.LOCAL_CONORMS.n: 10}
         return True
 
     def compute_local_eigenvector_norm(self):
@@ -243,5 +275,12 @@ class FCFederatedPCA:
         self.local_eigenvector_norm = np.dot(self.pca.G[:, self.current_vector],
                                   self.pca.G[:, self.current_vector])
         self.current_vector = self.current_vector + 1
-        self.out = {'local_eigenvector_norm': self.local_eigenvector_norm}
+
+        self.out = {COParams.LOCAL_EIGENVECTOR_NORM.n: float(self.local_eigenvector_norm)}
+        return True
+
+    def compute_qr(self):
+        self.init_random()
+        q, self.r = la.qr(self.tabdata.scaled.T, mode='economic')
+        self.out = {COParams.R.n: self.r}
         return True

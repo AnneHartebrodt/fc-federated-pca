@@ -50,6 +50,12 @@ def compute_correlations(canonical, split, reported_angles=20):
         correlations.append(c[0,1])
     return correlations
 
+def compare_eigenvalues(canonical, federated):
+    diff = []
+    for i in min(len(canonical), len(federated)):
+        diff.append(abs(canonical[i]-federated[i]), 2)
+    return diff
+
 
 def compute_save_angles(W0, W1, study_id, filename, outfile, reported_angles=20):
     angles = compute_angles(W0, W1, reported_angles=reported_angles)
