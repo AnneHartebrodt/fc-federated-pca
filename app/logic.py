@@ -171,7 +171,7 @@ class AppLogic:
             handle.write('end\t' + str(end)+'\n')
             handle.write('elapsed\t' + str(end-self.start_time)+'\n')
             handle.write('communication rounds\t' + str(self.iteration)+'\n')
-            handle.write('packages sent\t' + str(len(self.communication_logger))+'\n')
+            handle.write('packages recieved\t' + str(len(self.communication_logger))+'\n')
             handle.write('average package size\t' + str(np.mean(self.communication_logger))+'\n')
             handle.write('max package size\t' + str(np.max(self.communication_logger))+'\n')
             handle.write('min package size\t' + str(np.min(self.communication_logger))+'\n')
@@ -229,7 +229,7 @@ class AppLogic:
     
                 elif self.svd[i].step == Step.INIT_POWER_ITERATION:
                     try:
-                        self.iteration = self.iteration + 1
+                        #self.iteration = self.iteration + 1
                         self.svd[i].init_random()
                         self.svd[i].init_power_iteration()
                     except Exception as e:
