@@ -40,7 +40,7 @@ do
   outputdir=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')
   outputdir=$app_test/$outputdir
   outdirs[${#outdirs[@]}]=$outputdir
-  sudo mkdir $controller_data_test_result/$app_test
+  sudo mkdir -p $controller_data_test_result/$app_test
 
 
   #echo $dirs
