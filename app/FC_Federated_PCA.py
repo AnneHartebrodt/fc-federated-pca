@@ -146,7 +146,7 @@ class FCFederatedPCA:
         # update PCA and save
         self.pca.G = np.dot(self.tabdata.scaled.T, incoming[COParams.H_GLOBAL.n])
         self.pca.H = incoming[COParams.H_GLOBAL.n]
-        self.pca.S = np.linalg.norm(self.pca.G, axis=1)
+        self.pca.S = np.sqrt(np.linalg.norm(self.pca.G, axis=1))
         self.pca.to_csv(self.left_eigenvector_file, self.right_eigenvector_file, self.eigenvalue_file)
         self.computation_done = True
         self.send_data = False
