@@ -16,9 +16,12 @@ def summarize(files, ids, outfile):
     dfl  = []
     cols = []
     for f in files:
-        df = pd.read_csv(f, sep='\t', header=None, index_col=None)
-        dfl.append(df.iloc[:,1])
-        cols = df.iloc[:,0].values
+        try:
+            df = pd.read_csv(f, sep='\t', header=None, index_col=None)
+            dfl.append(df.iloc[:,1])
+            cols = df.iloc[:,0].values
+        except:
+            print('File not found')
     df = pd.concat(dfl, axis=1)
     df = df.transpose().values
     ids = np.asarray(ids)
