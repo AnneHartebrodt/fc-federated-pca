@@ -15,23 +15,25 @@ import app.PCA.markdown_utils as md
 def summarize(files, ids, outfile):
     dfl  = []
     cols = []
-    for f in files:
+    actual_ids = []
+    for f in range(len(files)):
         try:
-            df = pd.read_csv(f, sep='\t', header=None, index_col=None)
+            df = pd.read_csv(files[f], sep='\t', header=None, index_col=None)
             print(df)
+            actual_ids.append(ids[f])
             dfl.append(df.iloc[:,1])
             cols = df.iloc[:,0].values
         except:
             print('File not found')
     df = pd.concat(dfl, axis=1)
     df = df.transpose().values
-    ids = np.asarray(ids)
-    ids = np.atleast_2d(ids).T
-    df = np.concatenate([ids, df], axis=1)
-    df = pd.DataFrame(df, dtype=np.float64)
-    cols = np.concatenate([['Run ID'], cols])
+    actual_ids= np.array(actual_ids)
+    actual_ids = np.atleast_2d(actual_ids).T
+    df = np.concatenate([actual_ids, df], axis=1)
+    df = pd.DataFrame(df)
+    cols = ['Run ID'] + cols.tolist()
     df.columns = cols
-    df = df.round(2)
+    #df = df.round(2)
     df.to_csv(outfile, sep='\t', index = False)
 
 
