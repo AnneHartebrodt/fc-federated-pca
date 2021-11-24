@@ -172,6 +172,7 @@ class AppLogic:
             handle.write('elapsed\t' + str(end-self.start_time)+'\n')
             handle.write('communication rounds\t' + str(self.iteration)+'\n')
             handle.write('packages recieved\t' + str(len(self.communication_logger))+'\n')
+            handle.write('total data sent'+ str(np.sum(self.communication_logger))+'\n')
             handle.write('average package size\t' + str(np.mean(self.communication_logger))+'\n')
             handle.write('max package size\t' + str(np.max(self.communication_logger))+'\n')
             handle.write('min package size\t' + str(np.min(self.communication_logger))+'\n')
