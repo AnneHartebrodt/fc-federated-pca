@@ -7,9 +7,10 @@ clidir=$2
 pydir=$3
 test_out=$4
 test_report=$5
+seed=$6
 #test_report=/home/anne/Documents/featurecloud/apps/tests
 
-seed=11
+#seed=11
 for od in $(ls $basedir/tests/$test_out/ )
 do
     # collect all output files in a string separated variable
