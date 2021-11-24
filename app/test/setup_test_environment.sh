@@ -8,6 +8,8 @@ basedir=$1
 clidir=$2
 pydir=$3
 outputfolder=$basedir/$4
+seed=$5
+sites=$6
 
 
 echo $basedir
@@ -18,7 +20,6 @@ mkdir -p $outputfolder
 
 features=10
 samples=5000
-seed=11
 batchcount=3
 k=10
 
@@ -36,7 +37,7 @@ python $pydir/generate_test_data.py -d $outputfolder -f $datafile -n $samples -m
 python $pydir/compute_canonical_solution.py -d $outputfolder -f $datafile -k $k -s $seed -b True --header 0 --transpose True
 
 #split the data into batches
-sites=4
+
 batch=True
 cross_val=True
 dirname=batch_cross

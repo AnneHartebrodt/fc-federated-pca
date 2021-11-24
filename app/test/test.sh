@@ -44,6 +44,8 @@ do
 
 
   #echo $dirs
+  echo python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
+    --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
   python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel local --query-interval 0 \
     --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
 
