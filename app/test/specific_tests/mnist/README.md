@@ -10,8 +10,11 @@ bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(
 ```
 split_dir=split_dir
 suffix_list=( "$test_out/single" )
-bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
-```
+for d in "${suffix_list[@]}"
+do
+  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $d $split_dir
+done
+
 
 ### Generate the report
 ```
@@ -44,7 +47,13 @@ do
 for sites in 3 5 10;
 mkdir -p mnist-output/$seed/$sites
 # generate report
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $(pwd)/test-output/$seed/$sites
+```
+split_dir=split_dir
+suffix_list=( "$test_out/single" )
+for d in "${suffix_list[@]}"
+do
+  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $d $split_dir
+done
 done
 done
 ```
