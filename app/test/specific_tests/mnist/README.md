@@ -10,7 +10,7 @@ bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(
 ### Run tests
 ```
 split_dir=split_dir
-suffix_list=( "$app_test/single" )
+suffix_list=( "$test_out/single" )
 bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
 ```
 
@@ -34,7 +34,7 @@ bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist
 # run test
 
 split_dir=split_dir
-suffix_list=( "$app_test/single" )
+suffix_list=( "$test_out/single" )
 bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
 done
 done
