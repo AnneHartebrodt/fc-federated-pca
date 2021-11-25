@@ -52,3 +52,14 @@ done
 ```
 
 
+```
+for seed in {11..20};
+do
+for sites in 3 5 10;
+do
+mkdir -p mnist-output/$seed/$sites
+bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $(pwd)/test-output/$seed/$sites
+done
+done
+```
+
