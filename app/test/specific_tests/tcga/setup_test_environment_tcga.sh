@@ -40,5 +40,5 @@ cross_val=False
 
 
 #python $pydir/generate_splits.py -d $outputfolder -o $dirname -F $datafile -n $sites -s $seed --transpose True
-python $pydir/generate_config_files.py -d $outputfolder -o . -i 1000 -q 0 -s 0 -a True -p True -n 0
+python $pydir/generate_config_files.py -d $outputfolder/$ct -o . -i 1000 -q 0 -s 0 -a True -p True -n 0
 done
