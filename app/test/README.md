@@ -56,3 +56,14 @@ bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)
 mkdir -p test-output/$seed/$sites
 bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $(pwd)/test-output/$seed/$sites $seed
 ```
+
+## Batchify
+```
+seed=11
+for sites in 3 5 10;
+do
+test_out=app_test/$seed/$sites
+bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites
+done
+
+```
