@@ -1,16 +1,16 @@
-clidir=/home/anne/Documents/featurecloud/test-environment/cli
-pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
-basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
-outputfolder=$basedir/app_test_tgca
-seed=1
-datafolder=/home/anne/Documents/featurecloud/data/tcga/cancer_type_site
+#clidir=/home/anne/Documents/featurecloud/test-environment/cli
+#pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+#basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
+#outputfolder=$basedir/app_test_tgca
+#seed=1
+#datafolder=/home/anne/Documents/featurecloud/data/tcga/cancer_type_site
 
-#basedir=$1
-#clidir=$2
-#pydir=$3
-#datafolder=$4
-#outputfolder=$basedir/$5
-#seed=$6
+basedir=$1
+clidir=$2
+pydir=$3
+datafolder=$4
+outputfolder=$basedir/$5
+seed=$6
 
 echo $pydir
 echo $basedir
