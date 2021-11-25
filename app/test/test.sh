@@ -17,7 +17,7 @@ controller_data_test_result=$basedir/tests
 count=1
 outdirs=()
 
-
+echo $app_test
 # loop over all configuration files
 for configf in $(ls $basedir/$app_test/config_files)
 do
