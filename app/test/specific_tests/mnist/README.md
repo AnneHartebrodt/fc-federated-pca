@@ -3,8 +3,9 @@
 ### Set up test environment
 ```
 seed=11
+sites=3
 test_out=mnist
-bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed
+bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
 ```
 
 ### Run tests
