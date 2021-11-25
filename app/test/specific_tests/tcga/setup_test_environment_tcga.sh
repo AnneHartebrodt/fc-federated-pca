@@ -1,16 +1,16 @@
-#clidir=/home/anne/Documents/featurecloud/test-environment/cli
-#pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
-#basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
-#datafile=data.tsv
-#outputfolder=$basedir/app_test
+clidir=/home/anne/Documents/featurecloud/test-environment/cli
+pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
+basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
+outputfolder=$basedir/app_test_tgca
+seed=1
+datafolder=/home/anne/Documents/featurecloud/data/tcga/cancer_type_site
 
-basedir=$1
-clidir=$2
-pydir=$3
-datafolder=$4
-outputfolder=$basedir/$5
-seed=$6
-sites=$7
+#basedir=$1
+#clidir=$2
+#pydir=$3
+#datafolder=$4
+#outputfolder=$basedir/$5
+#seed=$6
 
 echo $pydir
 echo $basedir
@@ -19,15 +19,24 @@ echo $datafile
 echo $outputfolder
 mkdir -p $outputfolder
 
+
 k=10
-dirs=($(ls -d $datafolder/*/data.tsv))
+
+for ct in $(ls $datafolder);
+do
+dirs=($(ls -d $datafolder/$ct/*/data.tsv))
+dirs=$(printf "%s " "${dirs[@]}")
+# remove trailing comma
 #compute canonical solution
-python $pydir/compute_canonical_solution.py -d $outputfolder -L $dirs -k $k -s $seed --transpose True
+echo $dirs
+mkdir -p $outputfolder/$ct
+python $pydir/compute_canonical_solution.py -d $outputfolder/$ct -L $dirs -k $k -s $seed --transpose True --rownames 0
 
 #split the data into batches
 batch=False
 cross_val=False
-dirname=single
+
 
 #python $pydir/generate_splits.py -d $outputfolder -o $dirname -F $datafile -n $sites -s $seed --transpose True
-python $pydir/generate_config_files.py -d $outputfolder -o $dirname -i 1000 -q 0 -s 0 -a True -p True -n 0
+python $pydir/generate_config_files.py -d $outputfolder -o . -i 1000 -q 0 -s 0 -a True -p True -n 0
+done

@@ -1,14 +1,15 @@
-## MNIST
+## TCGA
 
 ### Set up test environment
 ```
 seed=11
-sites=4
-test_out=mnist/$seed/$sites
-bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
+test_out=app_test_tcga
+bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/cancer_type_site $test_out $seed
 ```
 ### Run tests
 ```
+
+suffix_list=( "Bladder" )
 bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out
 ```
 

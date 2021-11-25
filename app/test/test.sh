@@ -4,33 +4,28 @@ basedir=$1
 clidir=$2
 pydir=$3
 app_test=$4
+split_dir=$5
+
 #clidir=/home/anne/Documents/featurecloud/test-environment/cli
 #pydir=/home/anne/Documents/featurecloud/apps/fc-federated-pca/app/test
 #basedir=/home/anne/Documents/featurecloud/test-environment/controller/data
-#app_test=app_test
-#
-#
-# current_test_dir_suffix=app_test/batch_cross
-
+#app_test=app_test/single
+#split_dir=data_split
 
 controller_data_test_result=$basedir/tests
 
 count=1
 outdirs=()
 
-suffix_list=( "$app_test/single" "$app_test/batch_cross" "$app_test/batch")
 
-for current_test_dir_suffix in "${suffix_list[@]}"
-do
-current_test_dir=$basedir/$current_test_dir_suffix
 # loop over all configuration files
-for configf in $(ls $current_test_dir/config_files)
+for configf in $(ls $basedir/$app_test/config_files)
 do
   # start run
   # collect all directories in a string separated variable
   cd $basedir
   echo $(pwd)
-  dirs=($(ls -d $current_test_dir_suffix/data_split/*))
+  dirs=($(ls -d $app_test/$split_dir/*))
   dirs=$(printf "%s," "${dirs[@]}")
   # remove trailing comma
   dirs=$(echo $dirs | sed 's/,*$//g')
@@ -46,11 +41,11 @@ do
   #echo $dirs
   echo python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel internet --query-interval 0 \
     --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
-  python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel internet --query-interval 0 \
-    --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
+  #python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel internet --query-interval 0 \
+   # --download-results $outputdir --generic-dir $current_test_dir_suffix/config_files/$configf
 
 done
-done
+
 
 
 # make sure the data is downloaded!!!

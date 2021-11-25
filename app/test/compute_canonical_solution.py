@@ -37,7 +37,7 @@ def concatenate_files(filelist, header=None, sep='\t', index_col=None):
 if __name__ == '__main__':
     parser = ap.ArgumentParser(description='Generate sample data for federated PCA')
     parser.add_argument('-d', metavar='DIRECTORY', type=str, help='output directory', default='.')
-    parser.add_argument('-f', metavar='INPUT_FILE', type=str, help='filename of data file')
+    parser.add_argument('-f', metavar='INPUT_FILE', type=str, help='filename of data file', default=None)
     parser.add_argument('-F', metavar='INPUT_FILE', type=str, help='filename of data file (full path)', default=None)
     parser.add_argument('-L', metavar='INPUT_FILE LIST', type=str, nargs='+', help='filenames of data file (full path)', default=None)
     parser.add_argument('-o', metavar='OUTPUT_FILE', type=str, help='output file prefix', default='eigen')
@@ -85,10 +85,12 @@ if __name__ == '__main__':
     else:
         output_folder = op.join(basedir, 'baseline_result')
 
-        if args.F is None:
+        if args.f is not None:
             input_file = op.join(basedir, 'data', args.f)
-        else:
+        elif args.F is not None:
             input_file = args.F
+        else:
+            input_file = concatenate_files(args.L, header=header, index_col=index_col, sep=args.separator)
         compute_and_save_canonical(input_file=input_file,
                                    output_folder=output_folder,
                                    seed=args.s,
