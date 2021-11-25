@@ -57,8 +57,11 @@ for seed in {11..20};
 do
 for sites in 3 5 10;
 do
-mkdir -p mnist-output/$seed/$sites
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $(pwd)/test-output/$seed/$sites
+test_out=mnist/$seed/$sites
+echo $test_out
+tout=$(pwd)/mnist-output/$seed/$sites/single
+mkdir -p $tout
+bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $tout
 done
 done
 ```
