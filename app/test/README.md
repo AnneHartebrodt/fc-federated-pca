@@ -12,7 +12,8 @@ cd cli
 # remove '~' to fit conda
 conda create --name cli --file requirements_conda.txt
 # additional dependecies
-conda install pyyaml scipy pando markdown
+conda activate cli
+conda install pyyaml scipy pandoc markdown
 cd ..
 ```
 
