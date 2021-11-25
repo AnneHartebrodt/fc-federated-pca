@@ -1,41 +1,21 @@
-## MNIST
+## TCGA
 
-### Set up test environment
-```
-test_out=tcga/
-bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
-```
-### Run tests
-```
-bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out
-```
-
-### Generate the report
-```
-mkdir -p mnist-output/$seed/$sites
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $(pwd)/test-output/$seed/$sites
-```
 ### Batchify
+
 ```
-for seed in {11..20};
-do
-for sites in 3 5 10;
-test_out=mnist/$seed/$sites
+test_out=tcga
+echo $test_out
 mkdir -p $test_out
 # generate data
-bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
+bash fc-federated-pca/app/test/specific_tests/tcga/setup_test_environment_tcga.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/cancer_type_site $test_out $seed 
+
 # run test
-bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out
-done
-done
-```
-```
-for seed in {11..20};
+split_dir='.'
+for ct in $(ls $(pwd)/test-data/cancer_type_site)
 do
-for sites in 3 5 10;
-mkdir -p mnist-output/$seed/$sites
-# generate report
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $(pwd)/test-output/$seed/$sites
+  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $ct $split_dir
 done
-done
+
 ```
+
+
