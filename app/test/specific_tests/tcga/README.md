@@ -13,7 +13,7 @@ bash fc-federated-pca/app/test/specific_tests/tcga/setup_test_environment_tcga.s
 split_dir='.'
 for ct in $(ls $(pwd)/test-data/cancer_type_site)
 do
-  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $ct $split_dir
+  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $ct
 done
 
 ```
