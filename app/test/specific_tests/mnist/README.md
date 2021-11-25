@@ -8,9 +8,9 @@ bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(
 ```
 ### Run tests
 ```
-
-suffix_list=( "Bladder" )
-bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out
+split_dir=split_dir
+suffix_list=( "$test_out/single" )
+bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
 ```
 
 ### Generate the report
@@ -31,7 +31,10 @@ mkdir -p $test_out
 # generate data
 bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
 # run test
-bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out
+
+split_dir=split_dir
+suffix_list=( "$test_out/single" )
+bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
 done
 done
 ```
