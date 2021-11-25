@@ -2,9 +2,7 @@
 
 ### Set up test environment
 ```
-seed=11
-sites=4
-test_out=mnist/$seed/$sites
+test_out=tcga/
 bash fc-federated-pca/app/test/specific_tests/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
 ```
 ### Run tests
