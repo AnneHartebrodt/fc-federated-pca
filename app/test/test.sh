@@ -25,7 +25,7 @@ do
   # collect all directories in a string separated variable
   cd $basedir
   echo $(pwd)
-  dirs=($(ls -d $basedir/$app_test/$split_dir/*))
+  dirs=($(ls -d $app_test/$split_dir/*))
   dirs=$(printf "%s," "${dirs[@]}")
   # remove trailing comma
   dirs=$(echo $dirs | sed 's/,*$//g')
@@ -40,9 +40,9 @@ do
 
   #echo $dirs
   echo python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel internet --query-interval 0 \
-    --download-results $outputdir --generic-dir $basedir/$app_test/config_files/$configf
+    --download-results $outputdir --generic-dir $app_test/config_files/$configf
   python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel internet --query-interval 0 \
-    --download-results $outputdir --generic-dir $basedir/$app_test/config_files/$configf
+    --download-results $outputdir --generic-dir $app_test/config_files/$configf
 
 done
 
