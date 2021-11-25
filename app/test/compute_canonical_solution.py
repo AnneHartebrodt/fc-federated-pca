@@ -12,7 +12,10 @@ import app.PCA.shared_functions as sh
 def compute_and_save_canonical(input_file, output_folder,k=10, seed = 11, prefix='singular', header=None, index_col=None,
                                sep='\t', transpose=False):
     np.random.seed(seed)
-    data = pd.read_csv(input_file, sep=sep, header=header, index_col=index_col)
+    if isinstance(input_file, str):
+        data = pd.read_csv(input_file, sep=sep, header=header, index_col=index_col)
+    else:
+        data = input_file
     if transpose:
         data = data.values.T
     else:
@@ -24,12 +27,19 @@ def compute_and_save_canonical(input_file, output_folder,k=10, seed = 11, prefix
     pd.DataFrame(s).to_csv(op.join(output_folder, prefix + '.values'), sep='\t', header=False, index=False)
     pd.DataFrame(v).to_csv(op.join(output_folder, prefix + '.right'), sep='\t', header=False, index=False)
 
+def concatenate_files(filelist, header=None, sep='\t', index_col=None):
+    fl = []
+    for f in filelist:
+        fl.append(pd.read_csv(f, header=header, sep=sep, index_col=index_col))
+    fl = pd.concat(fl, axis=0)
+    return fl
 
 if __name__ == '__main__':
     parser = ap.ArgumentParser(description='Generate sample data for federated PCA')
     parser.add_argument('-d', metavar='DIRECTORY', type=str, help='output directory', default='.')
     parser.add_argument('-f', metavar='INPUT_FILE', type=str, help='filename of data file')
     parser.add_argument('-F', metavar='INPUT_FILE', type=str, help='filename of data file (full path)', default=None)
+    parser.add_argument('-L', metavar='INPUT_FILE LIST', type=str, nargs='+', help='filenames of data file (full path)', default=None)
     parser.add_argument('-o', metavar='OUTPUT_FILE', type=str, help='output file prefix', default='eigen')
     parser.add_argument('-k', metavar='K', type=int, help='Number of dimensions')
     parser.add_argument('-s', metavar='SEED', type=int, help='random seed', default=11)
@@ -56,19 +66,22 @@ if __name__ == '__main__':
         input_folders = [int(i) for i in input_folders]
         for i in input_folders:
             output_folder = op.join(basedir, 'baseline_result', str(i))
-            if args.F is None:
+            if args.f is not None:
                 input_file = op.join(basedir, 'data', str(i), args.f)
-            else:
+            elif args.F is not None :
                 input_file = args.F
+            else:
+                input_file = concatenate_files(args.L, header=header, index_col=index_col, sep=args.separator)
+
             compute_and_save_canonical(input_file=input_file,
-                                       output_folder=output_folder,
-                                       seed=i,
-                                       prefix=args.o,
-                                       k=args.k,
-                                       header=header,
-                                       index_col=index_col,
-                                       sep=args.separator,
-                                       transpose=args.transpose)
+                                           output_folder=output_folder,
+                                           seed=i,
+                                           prefix=args.o,
+                                           k=args.k,
+                                           header=header,
+                                           index_col=index_col,
+                                           sep=args.separator,
+                                           transpose=args.transpose)
     else:
         output_folder = op.join(basedir, 'baseline_result')
 
