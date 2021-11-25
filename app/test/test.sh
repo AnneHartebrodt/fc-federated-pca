@@ -25,7 +25,7 @@ do
   # collect all directories in a string separated variable
   cd $basedir
   echo $(pwd)
-  dirs=($(ls -d $app_test/$split_dir/*))
+  dirs=($(ls -d $basedir/$app_test/$split_dir/*))
   dirs=$(printf "%s," "${dirs[@]}")
   # remove trailing comma
   dirs=$(echo $dirs | sed 's/,*$//g')
