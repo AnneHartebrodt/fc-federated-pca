@@ -48,7 +48,9 @@ bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/
 ```
 ### Run the app
 ```
-bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out
+split_dir=split_dir
+suffix_list=( "$app_test/single" "$app_test/batch_cross" "$app_test/batch")
+bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
 ```
 
 ### Generate the report
@@ -64,6 +66,10 @@ for sites in 3 5 10;
 do
 test_out=app_test/$seed/$sites
 bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites
+
+split_dir=split_dir
+suffix_list=( "$app_test/single" "$app_test/batch_cross" "$app_test/batch")
+bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $split_dir $suffix_list
 done
 
 ```
