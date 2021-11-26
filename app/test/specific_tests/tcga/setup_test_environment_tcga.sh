@@ -32,7 +32,7 @@ echo $dirs
 mkdir -p $outputfolder/$ct
 mkdir -p $outputfolder/$ct/data
 cp -r $datafolder/$ct/* $outputfolder/$ct/data
-#python $pydir/compute_canonical_solution.py -d $outputfolder/$ct -L $dirs -k $k -s $seed --transpose True --rownames 0
+python $pydir/compute_canonical_solution.py -d $outputfolder/$ct -L $dirs -k $k -s $seed --transpose True --rownames 0
 
 #split the data into batches
 batch=False
