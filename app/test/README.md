@@ -43,7 +43,7 @@ export PYTHONPATH=$(pwd)/fc-federated-pca
 ```
 seed=11
 sites=4
-test_out=app_test/$seed/$sites
+test_out=app_test
 bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites
 ```
 ### Run the app
@@ -58,8 +58,12 @@ done
 
 ### Generate the report
 ```
-mkdir -p test-output/$seed/$sites
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $(pwd)/test-output/$seed/$sites $seed
+suffix_list=( "$test_out/single" "$test_out/batch_cross" "$test_out/batch")
+for d in "${suffix_list[@]}"
+do
+mkdir -p test-output
+bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $(pwd)/test-output $seed $test_out/baseline_result
+done
 ```
 
 ## Batchify
@@ -74,7 +78,7 @@ split_dir=split_dir
 suffix_list=( "$test_out/single" "$test_out/batch_cross" "$test_out/batch")
 for d in "${suffix_list[@]}"
 do
-  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir
+  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir $
 done
 done
 
