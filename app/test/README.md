@@ -48,7 +48,7 @@ bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/
 ```
 ### Run the app
 ```
-split_dir=split_dir
+split_dir=data_split
 suffix_list=( "$test_out/single" "$test_out/batch_cross" "$test_out/batch")
 for d in "${suffix_list[@]}"
 do
