@@ -62,7 +62,7 @@ test_out=mnist/$seed/$sites
 echo $test_out
 tout=$(pwd)/mnist-output/$seed/$sites/single
 mkdir -p $tout
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $tout
+bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $tout $test_out/baseline_result
 done
 done
 ```
