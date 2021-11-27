@@ -61,8 +61,9 @@ do
 test_out=mnist/$seed/$sites
 echo $test_out
 tout=$(pwd)/mnist-output/$seed/$sites/single
-mkdir -p $tout
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $tout $seed $test_out/baseline_result
+mkdir -p $tout 
+# seed is empty! Don't put
+bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out/single  $tout $test_out/baseline_result
 done
 done
 ```
