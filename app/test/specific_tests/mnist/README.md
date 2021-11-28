@@ -38,7 +38,7 @@ test_out=mnist/$seed/$sites
 echo $test_out
 mkdir -p $test_out
 # generate data
-#bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
+bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
 
 # run test
 split_dir=data_split
@@ -61,8 +61,9 @@ do
 test_out=mnist/$seed/$sites
 echo $test_out
 tout=$(pwd)/mnist-output/$seed/$sites/single
-mkdir -p $tout
-bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out  $tout
+mkdir -p $tout 
+# seed is empty! Don't put
+bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out/single  $tout $test_out/baseline_result
 done
 done
 ```
