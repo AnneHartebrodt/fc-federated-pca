@@ -695,7 +695,7 @@ class AppLogic:
                         smpc_outgoing_dict = {}
 
 
-            time.sleep(1)
+            #time.sleep(1)
 
 
 logic = AppLogic()
