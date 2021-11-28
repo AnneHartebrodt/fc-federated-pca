@@ -39,11 +39,14 @@ echo $test_out
 mkdir -p $test_out
 # generate data
 bash fc-federated-pca/app/test/specific_tests/mnist/setup_test_environment_mnist.sh $(pwd)/controller/data $(pwd)/cli $(pwd)/fc-federated-pca/app/test $(pwd)/test-data/mnist/mnnist.tsv $test_out $seed $sites
+done 
 
 # run test
 split_dir=data_split
 suffix_list=( "$test_out/single" )
 for d in "${suffix_list[@]}"
+do
+for sites in 3 5 10;
 do
 echo $d
   bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir
