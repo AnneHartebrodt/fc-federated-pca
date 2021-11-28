@@ -10,7 +10,8 @@ def make_default_config_file(algorithm = 'power_iteration',
                              batch=False,
                              train_test=False,
                              maxit=500,
-                             use_smpc = True):
+                             use_smpc = True,
+                             datafile = 'data.tsv'):
 
     """
     Default config file generator
@@ -19,7 +20,7 @@ def make_default_config_file(algorithm = 'power_iteration',
     """
     dict = {'fc_pca':
              {'input':
-                  {'data': 'data.tsv',
+                  {'data': datafile,
                    'batch': batch,
                    'train_test': train_test},
               'output':
@@ -54,7 +55,7 @@ def write_config(config, basedir, counter):
 
 
 def create_configs_power(output_folder, batch=False, train_test=False, maxit=500,     qr = ['federated_qr', 'no_qr'],
-                         init=['approximate_pca', 'random'], use_smpc=[True, False]):
+                         init=['approximate_pca', 'random'], use_smpc=[True, False], datafile='data.tsv'):
 
     counter = 0
     for q in qr:
@@ -66,16 +67,18 @@ def create_configs_power(output_folder, batch=False, train_test=False, maxit=500
                                                   init=i,
                                                   train_test=train_test,
                                                   maxit=maxit,
-                                                  use_smpc=s)
+                                                  use_smpc=s,
+                                                  datafile=datafile)
                 write_config(config=config, basedir=output_folder, counter=counter)
                 counter = counter + 1
     return counter
 
-def create_configs_single_round(output_folder, count, batch=True, train_test=True, maxit=500, use_smpc=[True, False]):
+def create_configs_single_round(output_folder, count, batch=True, train_test=True, maxit=500, use_smpc=[True, False], datafile='data.tsv'):
     counter = count
     for a in ['approximate_pca', 'full_covariance','qr_pca']:
         for s in use_smpc:
-            config = make_default_config_file(batch=batch, algorithm=a, train_test=train_test, maxit=maxit, use_smpc=s)
+            config = make_default_config_file(batch=batch, algorithm=a, train_test=train_test, maxit=maxit, use_smpc=s,
+                                              datafile=datafile)
             write_config(config=config, basedir=output_folder, counter=str(counter))
             counter = counter+1
 
@@ -91,6 +94,8 @@ if __name__ == '__main__':
     parser.add_argument('-p', metavar='POWER ITERATION', type=bool, help='power iteration', default=True)
     parser.add_argument('-a', metavar='ONE SHOT METHODS', type=bool, help='one shot methods', default=True)
     parser.add_argument('-n', metavar='INIT', type=int, help='0=random, 1=approximate, 2=both', default=0)
+    parser.add_argument('-f', metavar='FILENAME', type=str, help='filename', default='data.tsv')
+
 
     args = parser.parse_args()
     basedir = args.d
@@ -121,9 +126,10 @@ if __name__ == '__main__':
 
     count = 0
     if args.p:
-        count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=args.i, qr=qr, use_smpc=smpc, init=init)
+        count = create_configs_power(output_folder, batch=args.b, train_test=args.t, maxit=args.i, qr=qr, use_smpc=smpc, init=init,
+                                     datafile=args.f)
     if args.a:
-        create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=args.i,use_smpc=smpc)
+        create_configs_single_round(output_folder, count, batch=args.b, train_test= args.t, maxit=args.i,use_smpc=smpc,datafile=args.f)
 
 
 
