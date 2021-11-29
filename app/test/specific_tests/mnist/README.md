@@ -30,7 +30,7 @@ bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)
 ### Batchify
 
 ```
-for seed in {11..20};
+for seed in {11..15};
 do
 for sites in 3 5 10;
 do
@@ -45,8 +45,13 @@ split_dir=data_split
 suffix_list=( "$test_out/single" )
 for d in "${suffix_list[@]}"
 do
-echo $d
-  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir
+if [ $(docker container ls -q | wc -w) -gt 15 ]
+then 
+echo 'Waiting for containers to finish before spawning new ones'
+sleep 1m
+else
+ bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir
+ fi
 done
 done
 done
