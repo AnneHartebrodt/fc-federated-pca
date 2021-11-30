@@ -45,13 +45,12 @@ split_dir=data_split
 suffix_list=( "$test_out/single" )
 for d in "${suffix_list[@]}"
 do
-if [ $(docker container ls -q | wc -w) -gt 15 ]
-then 
+while [ $(docker container ls -q | wc -w) -gt 15 ]
+do
 echo 'Waiting for containers to finish before spawning new ones'
 sleep 1m
-else
+done
  bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir
- fi
 done
 done
 done
