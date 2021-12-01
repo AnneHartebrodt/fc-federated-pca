@@ -43,8 +43,9 @@ export PYTHONPATH=$(pwd)/fc-federated-pca
 ```
 seed=11
 sites=4
+samples=5000
 test_out=app_test
-bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites
+bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites $samples
 ```
 ### Run the app
 ```
