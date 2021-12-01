@@ -32,7 +32,7 @@ bash fc-federated-pca/app/test/generate_report.sh $(pwd)/controller/data/ $(pwd)
 ```
 for seed in {11..15};
 do
-for sites in 3 5 10;
+for sites in 3 5;
 do
 test_out=mnist/$seed/$sites
 # generate data
@@ -58,7 +58,7 @@ done
 ```
 for seed in {11..20};
 do
-for sites in 3 5 10;
+for sites in 3 5;
 do
 test_out=mnist/$seed/$sites
 echo $test_out
