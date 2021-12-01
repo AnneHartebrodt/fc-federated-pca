@@ -53,6 +53,7 @@ split_dir=data_split
 suffix_list=( "$test_out/single" "$test_out/batch_cross" "$test_out/batch")
 for d in "${suffix_list[@]}"
 do
+  # bash TESTSCRIPT CONTROLLER_DATA_DIR CLI_DIR TESTSCIPT_DIR $DATA_DIR_SUFFIX $DATA_LOCATION
   bash fc-federated-pca/app/test/test.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $d $split_dir
 done
 ```
