@@ -10,6 +10,7 @@ pydir=$3
 outputfolder=$basedir/$4
 seed=$5
 sites=$6
+samples=$7
 
 
 echo $basedir
@@ -19,7 +20,6 @@ echo $outputfolder
 mkdir -p $outputfolder
 
 features=10
-samples=5000
 batchcount=3
 k=10
 
