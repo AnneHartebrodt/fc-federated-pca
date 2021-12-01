@@ -37,7 +37,11 @@ do
   outdirs[${#outdirs[@]}]=$outputdir
   sudo mkdir -p $controller_data_test_result/$app_test
 
-
+ while [ $(docker container ls -q | wc -w) -gt 2 ]
+  do
+  echo 'Waiting for containers to finish before spawning new ones'
+  sleep 1m
+  done
   #echo $dirs
   echo python $clidir/cli.py start --controller-host http://localhost:8000 --client-dirs $dirs --app-image federated_pca_batch:latest --channel internet --query-interval 0 \
     --download-results $outputdir --generic-dir $app_test/config_files/$configf
