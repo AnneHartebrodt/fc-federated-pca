@@ -74,10 +74,11 @@ done
 ## Batchify
 ```
 seed=11
+samples=5000
 for sites in 3 5 10;
 do
 test_out=app_test/$seed/$sites
-bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites
+bash fc-federated-pca/app/test/setup_test_environment.sh $(pwd)/controller/data/ $(pwd)/cli $(pwd)/fc-federated-pca/app/test $test_out $seed $sites $samples
 
 split_dir=data_split
 suffix_list=( "$test_out/single" "$test_out/batch_cross" "$test_out/batch")
