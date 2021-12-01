@@ -24,7 +24,7 @@ k=10
 
 for ct in $(ls $datafolder);
 do
-dirs=($(ls -d $datafolder/$ct/*/data.tsv))
+dirs=($(ls -d $datafolder/$ct/*/scaled.tsv))
 dirs=$(printf "%s " "${dirs[@]}")
 # remove trailing comma
 #compute canonical solution
