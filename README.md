@@ -18,6 +18,7 @@ fc_pca:
   input:
     batch: false ## use a batch setting where multiple subdirectories are decomposed simulatenously
     data: test_data.tsv # name of the test data set
+    train_test: false # is the data split into train/test folders?
   output:
     eigenvalues: eigenvalues.tsv ## standard output file names
     left_eigenvectors: left_eigenvectors.tsv
@@ -26,9 +27,12 @@ fc_pca:
   privacy:
     allow_transmission: false 
     encryption: no_encryption
+    use_smpc: true # use Secure Multiparty Computation
+    exponent: 3 #static exponent for SMPC
   settings:
     colnames: false ## data table settings
     delimiter: "\t"
     rownames: false
+
 
 ```
