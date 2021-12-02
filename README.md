@@ -5,6 +5,8 @@ Singular value decomposition is the standard way of performing PCA on large data
 
 The app is written using an early version of the Featurecloud template and uses the (Python) Bottle framework. More information on the usage of the app can be found in the FeatureCloud App store. 
 
+For more information on the algorithms behind this app, you might find [this repository](https://gitlab.com/hartebrodt/federated_dp_pca) useful where simulation code for the algorithms can be found.
+
 ## Configuration file:
 Use this standard configuration file to set up your workflow. When assembling your workflow, you need to create one config file for the entiere workflow. The format is .yml/.yaml standard.
 
