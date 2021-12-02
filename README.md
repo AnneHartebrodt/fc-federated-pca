@@ -1,7 +1,9 @@
 # Singular Value Decomposition App
 
 ## Perform singular values decomposition (SVD) on tabular data
-Singular value decomposition is the standard way of performing PCA on large datasets because it avoids computing the covariance matrix. In federated learning, there are exact and approximate SVD, which are both implemented in this application.
+Singular value decomposition is the standard way of performing PCA on large datasets because it avoids computing the covariance matrix. In federated learning, there are exact and approximate SVD, which are both implemented in this application. This application is an app which works with the Featurecloud platform. If you want to learn more about the Project refer to the website: [featurecloud.ai] (featurecloud.ai). 
+
+The app is written using an early version of the Featurecloud template and uses the (Python) Bottle framework. More information on the usage of the app can be found in the FeatureCloud App store. 
 
 ## Configuration file:
 Use this standard configuration file to set up your workflow. When assembling your workflow, you need to create one config file for the entiere workflow. The format is .yml/.yaml standard.
