@@ -1,5 +1,9 @@
 # Singular Value Decomposition App
 
+**This repository belongs to a test version federated PCA app which implements different algorithms. For a fast, efficient and user-friedly app please refer to the following repository [fc-federated-svd](https://github.com/AnneHartebrodt/fc-federated-svd)**
+
+
+
 ## Perform singular values decomposition (SVD) on tabular data
 Singular value decomposition is the standard way of performing PCA on large datasets because it avoids computing the covariance matrix. In federated learning, there are exact and approximate SVD, which are both implemented in this application. This application is an app which works with the Featurecloud platform. If you want to learn more about the Project refer to the website: [featurecloud.ai] (featurecloud.ai). 
 
